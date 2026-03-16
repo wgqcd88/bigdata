@@ -1,0 +1,1 @@
+FROM flink:2.2.0-scala_2.12-java21
