@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-thrift-defaults
+  namespace: spark
+data:
+  spark-defaults.conf: |
+    spark.master                                  k8s://https://kubernetes.default.svc
+    spark.submit.deployMode                       client
+    spark.kubernetes.authenticate.driver.serviceAccountName   spark
+    spark.kubernetes.authenticate.executor.serviceAccountName spark
+    spark.kubernetes.container.image              azure/spark:3.5.7
+    spark.kubernetes.namespace                    default
+    spark.driver.cores                            2
+    spark.driver.memory                          8g
+    spark.executor.cores                          2
+    spark.executor.memory                        4g
+    spark.dynamicAllocation.enabled               true
+    spark.dynamicAllocation.shuffleTracking.enabled true
+    spark.dynamicAllocation.minExecutors          0
+    spark.dynamicAllocation.maxExecutors          20
+    spark.dynamicAllocation.executorIdleTimeout   600s
+    spark.sql.catalogImplementation               hive
+    spark.hadoop.hive.metastore.uris              thrift://hive-metastore:9083
+    spark.sql.warehouse.dir                       abfs://warehouse@xxx.dfs.core.windows.net/hive/warehouse
+    spark.sql.shuffle.partitions                  200
+    spark.sql.adaptive.enabled                    true
+    
+    spark.eventLog.enabled                        true
+    spark.eventLog.dir                            abfs://spark-history@xxx.dfs.core.windows.net/
+    
+    spark.eventLog.rolling.enabled                true
+    spark.eventLog.rolling.maxFileSize             128m
+    
+    spark.driver.extraJavaOptions                 -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+    spark.executor.extraJavaOptions               -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+    
+    spark.network.timeout                         800s
+    spark.executor.heartbeatInterval              60s
+    
+    spark.hadoop.fs.azure.account.auth.type             Custom
+    spark.hadoop.fs.azure.account.oauth.provider.type   com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
+    spark.hadoop.fs.azure.account.hns.enabled           false
+    spark.hadoop.fs.azure.account.oauth2.client.id      ${MI_CLIENT_ID}
+    spark.hadoop.fs.azure.account.oauth2.msi.endpoint   http://169.254.169.254/metadata/identity/oauth2/token
+    spark.hadoop.fs.azure.account.oauth2.msi.tenant     ${TENANT_ID}
+    spark.hadoop.fs.azure.enable.blob.endpoint          true
+    spark.hadoop.fs.azure.fns.account.service.type      BLOB
+    spark.hadoop.fs.azure.enable.check.access           false
+    spark.history.ui.port                               18080
+    spark.security.authentication                       false
+
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-thrift-server
+  namespace: spark
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-thrift-server
+  template:
+    metadata:
+      labels:
+        app: spark-thrift-server
+    spec:
+      securityContext:
+        runAsUser: 185
+        runAsGroup: 0
+        fsGroup: 0
+      nodeSelector:
+        spark-thrift-server: "support"
+      containers:
+        - name: spark-thrift-server
+          image: ${ACR_LOGIN_SERVER}/${SPARK_IMAGE}
+          command: ["/opt/spark/sbin/start-thriftserver.sh"]
+          env:
+            - name:  "TZ"
+              value: "Asia/Shanghai"
+            - name: SPARK_NO_DAEMONIZE
+              value: "1"
+          ports:
+            - name: spark-thrift-server
+              containerPort: 10000
+          resources:
+            requests:
+              memory: "8g"
+              cpu: "2"
+          volumeMounts:
+            - mountPath: "/opt/spark/conf"
+              name: spark-thrift-server-volume
+      volumes:
+        - name: spark-thrift-server-volume
+          configMap:
+            name: spark-thrift-defaults
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-thrift-server
+  namespace: spark
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: spark-thrift-server
+  ports:
+    - protocol: TCP
+      port: 10000
+      targetPort: 10000
+

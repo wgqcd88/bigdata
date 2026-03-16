@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-defaults
+  namespace: spark
+data:
+  spark-defaults.conf: |
+    spark.eventLog.enabled                              true
+    spark.eventLog.dir                                  abfs://${CONTAINER_NAME_TPCDS}@${SA_NAME}.dfs.core.windows.net/sparkhistory
+    spark.history.fs.logDirectory                       abfs://${CONTAINER_NAME_TPCDS}@${SA_NAME}.dfs.core.windows.net/sparkhistory
+    spark.hadoop.fs.azure.account.auth.type             Custom
+    spark.hadoop.fs.azure.account.oauth.provider.type   com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
+    spark.hadoop.fs.azure.account.hns.enabled           false
+    spark.hadoop.fs.azure.account.oauth2.client.id      ${MI_CLIENT_ID}
+    spark.hadoop.fs.azure.account.oauth2.msi.endpoint   http://169.254.169.254/metadata/identity/oauth2/token
+    spark.hadoop.fs.azure.account.oauth2.msi.tenant     ${TENANT_ID}
+    spark.hadoop.fs.azure.enable.blob.endpoint          true
+    spark.hadoop.fs.azure.fns.account.service.type      BLOB
+    spark.hadoop.fs.azure.enable.check.access           false
+    spark.history.ui.port                               18080
+    spark.security.authentication                       false
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-history
+  namespace: spark
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-history
+  template:
+    metadata:
+      labels:
+        app: spark-history
+    spec:
+      securityContext:
+        runAsUser: 185
+        runAsGroup: 0
+        fsGroup: 0
+      nodeSelector:
+        spark-history: "support"
+
+      containers:
+        - name: spark-history
+          image: ${ACR_LOGIN_SERVER}/${SPARK_IMAGE}
+          command: ["/opt/spark/sbin/start-history-server.sh"]
+          env:
+            - name:  "TZ"
+              value: "Asia/Shanghai"
+            - name: SPARK_NO_DAEMONIZE
+              value: "1"
+          ports:
+            - containerPort: 8443
+          resources:
+            requests:
+              memory: "8g"
+              cpu: "2"
+          volumeMounts:
+            - mountPath: "/opt/spark/conf"
+              name: spark-history-volume
+      volumes:
+        - name: spark-history-volume
+          configMap:
+            name: spark-defaults
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-history
+  namespace: spark
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: spark-history
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 18080
+
