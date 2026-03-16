@@ -7,16 +7,33 @@ spec:
   template:
     spec:
       containers:
-        - name: historyserver
-          image: flink:1.17.2
+        - name: flink-historyserver
+          image: azure/flink:2.2.0
           command: ["/opt/flink/bin/historyserver.sh"]
           env:
             - name: FLINK_HISTORYSERVER_OPTS
               value: |
-                -Xms512m
-                -Xmx1024m
+                -Xms6g
+                -Xmx6g
                 -Dhistoryserver.web.port=8082
                 -Djobmanager.archive.fs.dir=abfss://flink@account.dfs.core.windows.net/archives
   selector:
     matchLabels:
-      app: hive-metastore
+      app: flink-historyserver
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-historyserver
+  namespace: flink
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: flink-historyserver
+  ports:
+    - protocol: TCP
+      port: 8082
+      targetPort: 8082
