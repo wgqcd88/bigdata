@@ -17,6 +17,15 @@ spec:
                 -Xmx6g
                 -Dhistoryserver.web.port=8082
                 -Djobmanager.archive.fs.dir=abfss://flink@account.dfs.core.windows.net/archives
+                -Dhadoop.fs.azure.account.auth.type=Custom
+                -Dhadoop.fs.azure.account.oauth.provider.type=com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
+                -Dhadoop.fs.azure.account.hns.enabled=true
+                -Dhadoop.fs.azure.account.oauth2.client.id=${MI_CLIENT_ID}
+                -Dhadoop.fs.azure.account.oauth2.msi.endpoin=thttp://169.254.169.254/metadata/identity/oauth2/token
+                -Dhadoop.fs.azure.account.oauth2.msi.tenant=${TENANT_ID}
+                -Dhadoop.fs.azure.enable.blob.endpoint=true
+                -Dhadoop.fs.azure.enable.check.access=false
+                -Dsecurity.authentication=false
   selector:
     matchLabels:
       app: flink-historyserver
