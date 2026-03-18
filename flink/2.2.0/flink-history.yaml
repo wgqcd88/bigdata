@@ -1,34 +1,83 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-config
+  namespace: flink
+data:
+  config.yaml: |
+    fs:
+      azure:
+        account:
+          oauth2:
+            msi:
+              endpoint: http://169.254.169.254/metadata/identity/oauth2/token
+              tenant: 16b3c013-d300-468d-ac64-7eda0820b6d3
+            client:
+              id: f5e0c725-5ace-4369-9ad4-6dceedbf6d79
+          auth:
+            type: Custom
+          oauth:
+            provider:
+              type: com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
+          hns:
+            enabled: true
+        custom:
+          token:
+            fetch:
+              retry:
+                count: 10
+        enable:
+          check:
+            access: false
+          blob:
+            endpoint: true
+    historyserver:
+      web:
+        port: 8082
+      archive:
+        fs:
+          dir: abfs://history@wgqsahn.dfs.core.windows.net/flink/archives
+        refresh-interval: 10000
+    env:
+      java:
+        opts:
+          all: --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.text=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED
+    rest:
+      address: 0.0.0.0
+    security:
+      authentication: false
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: flink-historyserver
+  namespace: flink
 spec:
   replicas: 1
-  template:
-    spec:
-      containers:
-        - name: flink-historyserver
-          image: azure/flink:2.2.0
-          command: ["/opt/flink/bin/historyserver.sh"]
-          env:
-            - name: FLINK_HISTORYSERVER_OPTS
-              value: |
-                -Xms6g
-                -Xmx6g
-                -Dhistoryserver.web.port=8082
-                -Djobmanager.archive.fs.dir=abfss://flink@account.dfs.core.windows.net/archives
-                -Dhadoop.fs.azure.account.auth.type=Custom
-                -Dhadoop.fs.azure.account.oauth.provider.type=com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
-                -Dhadoop.fs.azure.account.hns.enabled=true
-                -Dhadoop.fs.azure.account.oauth2.client.id=${MI_CLIENT_ID}
-                -Dhadoop.fs.azure.account.oauth2.msi.endpoin=thttp://169.254.169.254/metadata/identity/oauth2/token
-                -Dhadoop.fs.azure.account.oauth2.msi.tenant=${TENANT_ID}
-                -Dhadoop.fs.azure.enable.blob.endpoint=true
-                -Dhadoop.fs.azure.enable.check.access=false
-                -Dsecurity.authentication=false
   selector:
     matchLabels:
       app: flink-historyserver
+  template:
+    metadata:
+      labels:
+        app: flink-historyserver
+    spec:
+      containers:
+        - name: flink-historyserver
+          image: wgqacr.azurecr.io/wgq/flink:2.2.0-20260317-2
+          args: ["history-server"]
+          volumeMounts:
+            - mountPath: "/opt/flink/conf/config.yaml"
+              subPath: config.yaml
+              name: flink-config
+              readOnly: true
+      volumes:
+        - name: flink-config
+          configMap:
+            name: flink-config
+
 
 ---
 apiVersion: v1
