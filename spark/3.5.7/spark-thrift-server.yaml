@@ -5,51 +5,46 @@ metadata:
   namespace: spark
 data:
   spark-defaults.conf: |
-    spark.master                                  k8s://https://kubernetes.default.svc
-    spark.submit.deployMode                       client
-    spark.kubernetes.authenticate.driver.serviceAccountName   spark
-    spark.kubernetes.authenticate.executor.serviceAccountName spark
-    spark.kubernetes.container.image              azure/spark:3.5.7
-    spark.kubernetes.namespace                    default
-    spark.driver.cores                            2
-    spark.driver.memory                          8g
-    spark.executor.cores                          2
-    spark.executor.memory                        4g
-    spark.dynamicAllocation.enabled               true
-    spark.dynamicAllocation.shuffleTracking.enabled true
-    spark.dynamicAllocation.minExecutors          0
-    spark.dynamicAllocation.maxExecutors          20
-    spark.dynamicAllocation.executorIdleTimeout   600s
-    spark.sql.catalogImplementation               hive
-    spark.hadoop.hive.metastore.uris              thrift://hive-metastore:9083
-    spark.sql.warehouse.dir                       abfs://warehouse@xxx.dfs.core.windows.net/hive/warehouse
-    spark.sql.shuffle.partitions                  200
-    spark.sql.adaptive.enabled                    true
-    
-    spark.eventLog.enabled                        true
-    spark.eventLog.dir                            abfs://spark-history@xxx.dfs.core.windows.net/
-    
-    spark.eventLog.rolling.enabled                true
-    spark.eventLog.rolling.maxFileSize             128m
-    
-    spark.driver.extraJavaOptions                 -XX:+UseG1GC -XX:MaxGCPauseMillis=200
-    spark.executor.extraJavaOptions               -XX:+UseG1GC -XX:MaxGCPauseMillis=200
-    
-    spark.network.timeout                         800s
-    spark.executor.heartbeatInterval              60s
-    
-    spark.hadoop.fs.azure.account.auth.type             Custom
-    spark.hadoop.fs.azure.account.oauth.provider.type   com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
-    spark.hadoop.fs.azure.account.hns.enabled           false
-    spark.hadoop.fs.azure.account.oauth2.client.id      ${MI_CLIENT_ID}
-    spark.hadoop.fs.azure.account.oauth2.msi.endpoint   http://169.254.169.254/metadata/identity/oauth2/token
-    spark.hadoop.fs.azure.account.oauth2.msi.tenant     ${TENANT_ID}
-    spark.hadoop.fs.azure.enable.blob.endpoint          true
-    spark.hadoop.fs.azure.fns.account.service.type      BLOB
-    spark.hadoop.fs.azure.enable.check.access           false
-    spark.history.ui.port                               18080
-    spark.security.authentication                       false
-
+    spark.master                                                k8s://https://kubernetes.default.svc
+    spark.submit.deployMode                                     client
+    spark.kubernetes.driver.node.selector.spark-driver          support
+    spark.kubernetes.executor.node.selector.spark-executor      support
+    spark.kubernetes.authenticate.driver.serviceAccountName     spark
+    spark.kubernetes.authenticate.executor.serviceAccountName   spark
+    spark.kubernetes.container.image                            azure/spark:3.5.7
+    spark.kubernetes.namespace                                  default
+    spark.driver.cores                                          2
+    spark.driver.memory                                         8g
+    spark.executor.cores                                        2
+    spark.executor.memory                                       4g
+    spark.dynamicAllocation.enabled                             true
+    spark.dynamicAllocation.shuffleTracking.enabled             true
+    spark.dynamicAllocation.minExecutors                        0
+    spark.dynamicAllocation.maxExecutors                        20
+    spark.dynamicAllocation.executorIdleTimeout                 600s
+    spark.sql.catalogImplementation                             hive
+    spark.hadoop.hive.metastore.uris                            thrift://hive-metastore:9083
+    spark.sql.warehouse.dir                                     abfs://warehouse@xxx.dfs.core.windows.net/hive/warehouse
+    spark.sql.shuffle.partitions                                200
+    spark.sql.adaptive.enabled                                  true
+    spark.eventLog.enabled                                      true
+    spark.eventLog.dir                                          abfs://spark-history@xxx.dfs.core.windows.net/
+    spark.eventLog.rolling.enabled                              true
+    spark.eventLog.rolling.maxFileSize                           128m
+    spark.driver.extraJavaOptions                               -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+    spark.executor.extraJavaOptions                             -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+    spark.network.timeout                                       800s
+    spark.executor.heartbeatInterval                            60s
+    spark.hadoop.fs.azure.account.auth.type                     Custom
+    spark.hadoop.fs.azure.account.oauth.provider.type           com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
+    spark.hadoop.fs.azure.account.hns.enabled                   true
+    spark.hadoop.fs.azure.account.oauth2.client.id              ${MI_CLIENT_ID}
+    spark.hadoop.fs.azure.account.oauth2.msi.endpoint           http://169.254.169.254/metadata/identity/oauth2/token
+    spark.hadoop.fs.azure.account.oauth2.msi.tenant             ${TENANT_ID}
+    spark.hadoop.fs.azure.enable.check.access                   false
+    spark.history.ui.port                                       18080
+    spark.security.authentication                               false
+    spark.hadoop.fs.azure.custom.token.file.cache.path          /tmp/.azure
 
 ---
 apiVersion: apps/v1
@@ -73,6 +68,7 @@ spec:
         fsGroup: 0
       nodeSelector:
         spark-thrift-server: "support"
+      serviceAccountName: spark
       containers:
         - name: spark-thrift-server
           image: ${ACR_LOGIN_SERVER}/${SPARK_IMAGE}
@@ -83,7 +79,7 @@ spec:
             - name: SPARK_NO_DAEMONIZE
               value: "1"
           ports:
-            - name: spark-thrift-server
+            - name: spark-thrift
               containerPort: 10000
           resources:
             requests:
@@ -100,7 +96,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: spark-thrift-server
+  name: spark-thrift
   namespace: spark
   annotations:
     service.beta.kubernetes.io/azure-load-balancer-internal: "true"
