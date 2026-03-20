@@ -7,6 +7,9 @@ data:
   config.yaml: |
     fs:
       azure:
+        data:
+          blocks:
+            buffer: bytebuffer
         account:
           oauth2:
             msi:
@@ -15,22 +18,25 @@ data:
             client:
               id: f5e0c725-5ace-4369-9ad4-6dceedbf6d79
           auth:
+          #  type: OAuth
             type: Custom
           oauth:
             provider:
+              #type: org.apache.hadoop.fs.azurebfs.oauth2.MsiTokenProvider
               type: com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
           hns:
             enabled: true
         custom:
           token:
             fetch:
+              file:
+                cache:
+                  path: /tmp/.azure
               retry:
                 count: 10
         enable:
           check:
             access: false
-          blob:
-            endpoint: true
     historyserver:
       web:
         port: 8082
@@ -64,9 +70,11 @@ spec:
       labels:
         app: flink-historyserver
     spec:
+      nodeSelector:
+        flink-history: "support"
       containers:
         - name: flink-historyserver
-          image: wgqacr.azurecr.io/wgq/flink:2.2.0-20260317-2
+          image: wgqacr.azurecr.io/wgq/flink:2.2.0-20260318
           args: ["history-server"]
           volumeMounts:
             - mountPath: "/opt/flink/conf/config.yaml"
