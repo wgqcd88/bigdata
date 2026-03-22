@@ -11,11 +11,11 @@ data:
     spark.kubernetes.executor.node.selector.spark-executor      support
     spark.kubernetes.authenticate.driver.serviceAccountName     spark
     spark.kubernetes.authenticate.executor.serviceAccountName   spark
-    spark.kubernetes.container.image                            azure/spark:3.5.7
-    spark.kubernetes.namespace                                  default
-    spark.driver.cores                                          2
-    spark.driver.memory                                         8g
-    spark.executor.cores                                        2
+    spark.kubernetes.container.image                            wgqacr.azurecr.io/wgq/spark:3.5.7-20260317
+    spark.kubernetes.namespace                                  spark
+    spark.driver.cores                                          1
+    spark.driver.memory                                         3g
+    spark.executor.cores                                        1
     spark.executor.memory                                       4g
     spark.dynamicAllocation.enabled                             true
     spark.dynamicAllocation.shuffleTracking.enabled             true
@@ -23,29 +23,33 @@ data:
     spark.dynamicAllocation.maxExecutors                        20
     spark.dynamicAllocation.executorIdleTimeout                 600s
     spark.sql.catalogImplementation                             hive
-    spark.hadoop.hive.metastore.uris                            thrift://hive-metastore:9083
-    spark.sql.warehouse.dir                                     abfs://warehouse@xxx.dfs.core.windows.net/hive/warehouse
+    spark.hadoop.hive.metastore.uris                            thrift://hive-metastore.hive.svc:9083
+    spark.sql.warehouse.dir                                     abfs://spark@wgqsahn.dfs.core.windows.net/hive/warehouse
     spark.sql.shuffle.partitions                                200
     spark.sql.adaptive.enabled                                  true
     spark.eventLog.enabled                                      true
-    spark.eventLog.dir                                          abfs://spark-history@xxx.dfs.core.windows.net/
+    spark.eventLog.dir                                          abfs://history@wgqsahn.dfs.core.windows.net/spark/eventlogs
     spark.eventLog.rolling.enabled                              true
     spark.eventLog.rolling.maxFileSize                           128m
-    spark.driver.extraJavaOptions                               -XX:+UseG1GC -XX:MaxGCPauseMillis=200
-    spark.executor.extraJavaOptions                             -XX:+UseG1GC -XX:MaxGCPauseMillis=200
+    spark.driver.extraJavaOptions                               -XX:+UseG1GC -XX:MaxGCPauseMillis=200 
+    spark.executor.extraJavaOptions                             -XX:+UseG1GC -XX:MaxGCPauseMillis=200 
     spark.network.timeout                                       800s
     spark.executor.heartbeatInterval                            60s
     spark.hadoop.fs.azure.account.auth.type                     Custom
     spark.hadoop.fs.azure.account.oauth.provider.type           com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
     spark.hadoop.fs.azure.account.hns.enabled                   true
-    spark.hadoop.fs.azure.account.oauth2.client.id              ${MI_CLIENT_ID}
+    spark.hadoop.fs.azure.account.oauth2.client.id              f5e0c725-5ace-4369-9ad4-6dceedbf6d79
     spark.hadoop.fs.azure.account.oauth2.msi.endpoint           http://169.254.169.254/metadata/identity/oauth2/token
-    spark.hadoop.fs.azure.account.oauth2.msi.tenant             ${TENANT_ID}
+    spark.hadoop.fs.azure.account.oauth2.msi.tenant             16b3c013-d300-468d-ac64-7eda0820b6d3
     spark.hadoop.fs.azure.enable.check.access                   false
-    spark.history.ui.port                                       18080
     spark.security.authentication                               false
     spark.hadoop.fs.azure.custom.token.file.cache.path          /tmp/.azure
-
+    spark.hiveconf.hive.server2.thrift.port                     10000
+    spark.hiveconf.hive.server2.thrift.bind.host                0.0.0.0
+    spark.driver.host                                           spark-thrift-server.spark.svc
+    spark.driver.port                                           7078
+    spark.driver.blockManager.port                              7079
+    spark.driver.bindAddress                                    0.0.0.0
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -71,20 +75,32 @@ spec:
       serviceAccountName: spark
       containers:
         - name: spark-thrift-server
-          image: ${ACR_LOGIN_SERVER}/${SPARK_IMAGE}
+          image: wgqacr.azurecr.io/wgq/spark:3.5.7-20260317
           command: ["/opt/spark/sbin/start-thriftserver.sh"]
           env:
+            - name: SPARK_USER
+              value: spark
             - name:  "TZ"
               value: "Asia/Shanghai"
             - name: SPARK_NO_DAEMONIZE
               value: "1"
+            - name: APP_NAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.name
+            - name: SPARK_DRIVER_BIND_ADDRESS
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.podIP
           ports:
             - name: spark-thrift
               containerPort: 10000
           resources:
             requests:
-              memory: "8g"
-              cpu: "2"
+              memory: "4Gi"
+              cpu: "1"
           volumeMounts:
             - mountPath: "/opt/spark/conf"
               name: spark-thrift-server-volume
@@ -96,7 +112,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: spark-thrift
+  name: spark-thrift-server
   namespace: spark
   annotations:
     service.beta.kubernetes.io/azure-load-balancer-internal: "true"
@@ -105,7 +121,16 @@ spec:
   selector:
     app: spark-thrift-server
   ports:
-    - protocol: TCP
+    - name: thrift-server
+      protocol: TCP
       port: 10000
       targetPort: 10000
+    - name: block-manager
+      protocol: TCP
+      port: 7078
+      targetPort: 7078
+    - name: driver-host
+      protocol: TCP
+      port: 7079
+      targetPort: 7079
 
