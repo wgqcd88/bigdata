@@ -1,0 +1,71 @@
+#scheduler-mode: reactive
+kubernetes:
+  pod-template-file:
+    jobmanager: /home/azureuser/flink-2.2.0/conf/jobmanager.yaml
+    taskmanager: /home/azureuser/flink-2.2.0/conf/taskmanager.yaml
+    #cluster-id: flink-app-demo
+  namespace: flink
+  container:
+    image: wgqacr.azurecr.io/wgq/flink:2.2.0-20260319-1
+  jobmanager:
+    service-account: flink
+  taskmanager:
+    service-account: flink
+fs:
+  azure:
+    account:
+      oauth2:
+        msi:
+          endpoint: http://169.254.169.254/metadata/identity/oauth2/token
+          tenant: 16b3c013-d300-468d-ac64-7eda0820b6d3
+        client:
+          id: f5e0c725-5ace-4369-9ad4-6dceedbf6d79
+      auth:
+        type: Custom
+      oauth:
+        provider:
+          type: com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
+      hns:
+        enabled: true
+    custom:
+      token:
+        fetch:
+          retry:
+            count: 10
+        file:
+          cache:
+            path: /tmp/.azure
+    enable:
+      check:
+        access: false
+      blob:
+        endpoint: true
+jobmanager:
+  archive:
+    fs:
+      dir: abfs://history@wgqsahn.dfs.core.windows.net/flink/archives
+  execution:
+    failover-strategy: region
+  bind-host: 0.0.0.0
+  memory:
+    process:
+      size: 1600m
+query:
+  server:
+    port: '6125'
+parallelism:
+  default: 1
+taskmanager:
+  numberOfTaskSlots: 1
+  memory:
+    process:
+      size: 1728m
+  bind-host: 0.0.0.0
+env:
+  java:
+    opts:
+      all: --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.text=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED
+rest:
+  address: 0.0.0.0
+security:
+  authentication: false
