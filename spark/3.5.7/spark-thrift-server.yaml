@@ -46,7 +46,7 @@ data:
     spark.hadoop.fs.azure.custom.token.file.cache.path          /tmp/.azure
     spark.hiveconf.hive.server2.thrift.port                     10000
     spark.hiveconf.hive.server2.thrift.bind.host                0.0.0.0
-    spark.driver.host                                           spark-thrift-server.spark.svc
+    spark.driver.host                                           spark-thrift-driver.spark.svc
     spark.driver.port                                           7078
     spark.driver.blockManager.port                              7079
     spark.driver.bindAddress                                    0.0.0.0
@@ -98,6 +98,12 @@ spec:
           ports:
             - name: spark-thrift
               containerPort: 10000
+            - name: driver-ui
+              containerPort: 4040
+            - name: driver-rpc
+              containerPort: 7078
+            - name: block-manager
+              containerPort: 7079
           resources:
             requests:
               memory: "4Gi"
@@ -139,12 +145,10 @@ kind: Service
 metadata:
   name: spark-thrift-driver
   namespace: spark
-  annotations:
-    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
 spec:
   type: ClusterIP
   selector:
-    app: spark-thrift-driver
+    app: spark-thrift-server
   ports:
     - name: block-manager
       protocol: TCP
