@@ -5,7 +5,7 @@ RUN apt-get update && \
     ln -sf /usr/bin/python3 /usr/bin/python && \
     python --version && \
     rm -rf /var/lib/apt/lists/* && \
-    pip3 install apache-flink==1.20.3 --break-system-packages
+    pip3 install apache-flink==1.20.3
 USER flink
 RUN mkdir -p /opt/flink/plugins/azure-fs-hadoop/  && \
     cp /opt/flink/opt/flink-azure-fs-hadoop-1.20.3.jar /opt/flink/plugins/azure-fs-hadoop/ && \
