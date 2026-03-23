@@ -1,0 +1,105 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flink-config
+  namespace: flink
+data:
+  config.yaml: |
+    fs:
+      azure:
+        data:
+          blocks:
+            buffer: bytebuffer
+        account:
+          oauth2:
+            msi:
+              endpoint: http://169.254.169.254/metadata/identity/oauth2/token
+              tenant: 16b3c013-d300-468d-ac64-7eda0820b6d3
+            client:
+              id: f5e0c725-5ace-4369-9ad4-6dceedbf6d79
+          auth:
+          #  type: OAuth
+            type: Custom
+          oauth:
+            provider:
+              #type: org.apache.hadoop.fs.azurebfs.oauth2.MsiTokenProvider
+              type: com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider
+          hns:
+            enabled: true
+        custom:
+          token:
+            fetch:
+              file:
+                cache:
+                  path: /tmp/.azure
+              retry:
+                count: 10
+        enable:
+          check:
+            access: false
+    historyserver:
+      web:
+        port: 8082
+      archive:
+        fs:
+          dir: abfs://history@wgqsahn.dfs.core.windows.net/flink/archives
+        refresh-interval: 10000
+    env:
+      java:
+        opts:
+          all: --add-exports=java.rmi/sun.rmi.registry=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED --add-exports=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED --add-exports=java.security.jgss/sun.security.krb5=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.text=ALL-UNNAMED --add-opens=java.base/java.time=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED
+    rest:
+      address: 0.0.0.0
+    security:
+      authentication: false
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flink-historyserver
+  namespace: flink
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flink-historyserver
+  template:
+    metadata:
+      labels:
+        app: flink-historyserver
+    spec:
+      nodeSelector:
+        flink-history: "support"
+      containers:
+        - name: flink-historyserver
+          image: wgqacr.azurecr.io/wgq/flink:1.20.3-20260323
+          args: ["history-server"]
+          volumeMounts:
+            - mountPath: "/opt/flink/conf/config.yaml"
+              subPath: config.yaml
+              name: flink-config
+              readOnly: true
+      volumes:
+        - name: flink-config
+          configMap:
+            name: flink-config
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flink-historyserver
+  namespace: flink
+  annotations:
+    service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+spec:
+  type: LoadBalancer
+  selector:
+    app: flink-historyserver
+  ports:
+    - protocol: TCP
+      port: 8082
+      targetPort: 8082
