@@ -1,0 +1,66 @@
+# CN config: disable wildfly-openssl to avoid SIGSEGV on Azure ABFS HTTPS
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: starrocks-cn-config
+  namespace: starrocks
+data:
+  cn.conf: |
+    sys_log_level = INFO
+    be_port = 9060
+    be_http_port = 8040
+    heartbeat_service_port = 9050
+    brpc_port = 8060
+    starlet_port = 9070
+    JAVA_OPTS="-Dorg.wildfly.openssl.path=invalid -Dorg.wildfly.openssl.path.ssl=invalid -Dorg.wildfly.openssl.path.crypto=invalid --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+
+---
+# StarRocks Cluster: FE (1 replica) + CN (2 replicas), no BE
+# For lakehouse query over Hive external catalog on Azure ABFS
+apiVersion: starrocks.com/v1
+kind: StarRocksCluster
+metadata:
+  name: starrocks
+  namespace: starrocks
+spec:
+  starRocksFeSpec:
+    image: starrocks/fe-ubuntu:4.0.8
+    replicas: 1
+    limits:
+      cpu: 2
+      memory: 8Gi
+    requests:
+      cpu: 2
+      memory: 8Gi
+    service:
+      type: LoadBalancer
+      annotations:
+        service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+      ports:
+        - name: query
+          containerPort: 9030
+          port: 9030
+    storageVolumes:
+      - name: fe-meta
+        storageSize: 10Gi
+        mountPath: /opt/starrocks/fe/meta
+      - name: fe-log
+        storageSize: 5Gi
+        mountPath: /opt/starrocks/fe/log
+    nodeSelector:
+      agentpool: userpool
+
+  starRocksCnSpec:
+    image: starrocks/cn-ubuntu:4.0.8
+    replicas: 2
+    limits:
+      cpu: 2
+      memory: 8Gi
+    requests:
+      cpu: 2
+      memory: 8Gi
+    configMapInfo:
+      configMapName: starrocks-cn-config
+      resolveKey: cn.conf
+    nodeSelector:
+      agentpool: userpool
