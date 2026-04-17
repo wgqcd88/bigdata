@@ -1,0 +1,171 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "hive-metastore.fullname" . }}-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hive-metastore.labels" . | nindent 4 }}
+data:
+  hive-site.xml: |
+    <?xml version="1.0" encoding="UTF-8"?>
+    <configuration>
+        <property>
+            <name>javax.jdo.option.ConnectionDriverName</name>
+            <value>{{ .Values.database.driverName }}</value>
+        </property>
+        <property>
+            <name>javax.jdo.option.ConnectionURL</name>
+            <value>{{ .Values.database.url | replace "&" "&amp;" }}</value>
+        </property>
+        <property>
+            <name>javax.jdo.option.ConnectionUserName</name>
+            <value>{{ .Values.database.username }}</value>
+        </property>
+        <property>
+            <name>javax.jdo.option.ConnectionPassword</name>
+            <value>{{ .Values.database.password }}</value>
+        </property>
+        <property>
+            <name>fs.azure.account.hns.enabled</name>
+            <value>{{ .Values.azure.hnsEnabled }}</value>
+        </property>
+        <property>
+            <name>fs.azure.enable.check.access</name>
+            <value>false</value>
+        </property>
+        <property>
+            <name>fs.azure.account.oauth2.msi.tenant</name>
+            <value>{{ .Values.azure.tenantId }}</value>
+        </property>
+        <property>
+            <name>fs.azure.account.oauth2.client.id</name>
+            <value>{{ .Values.azure.clientId }}</value>
+        </property>
+        <property>
+            <name>hive.server2.enable.doAs</name>
+            <value>false</value>
+        </property>
+        <property>
+            <name>hive.tez.exec.inplace.progress</name>
+            <value>false</value>
+        </property>
+        <property>
+            <name>hive.tez.exec.print.summary</name>
+            <value>true</value>
+        </property>
+        <property>
+            <name>hive.exec.scratchdir</name>
+            <value>/opt/hive/scratch_dir</value>
+        </property>
+        <property>
+            <name>hive.user.install.directory</name>
+            <value>/opt/hive/install_dir</value>
+        </property>
+        <property>
+            <name>tez.runtime.optimize.local.fetch</name>
+            <value>true</value>
+        </property>
+        <property>
+            <name>hive.exec.submit.local.task.via.child</name>
+            <value>false</value>
+        </property>
+        <property>
+            <name>hive.compactor.worker.threads</name>
+            <value>1</value>
+        </property>
+        <property>
+            <name>mapreduce.framework.name</name>
+            <value>local</value>
+        </property>
+        <property>
+            <name>tez.local.mode</name>
+            <value>true</value>
+        </property>
+        <property>
+            <name>hive.metastore.warehouse.dir</name>
+            <value>/opt/hive/data/warehouse</value>
+        </property>
+        <property>
+            <name>metastore.metastore.event.db.notification.api.auth</name>
+            <value>false</value>
+        </property>
+        <property>
+            <name>fs.azure.account.auth.type</name>
+            <value>Custom</value>
+        </property>
+        <property>
+            <name>fs.azure.account.oauth2.msi.endpoint</name>
+            <value>http://169.254.169.254/metadata/identity/oauth2/token</value>
+        </property>
+        <property>
+            <name>fs.azure.account.oauth.provider.type</name>
+            <value>com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider</value>
+        </property>
+        <property>
+            <name>hive.metastore.uri</name>
+            <value>thrift://{{ include "hive-metastore.fullname" . }}.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.service.port }}</value>
+        </property>
+        <property>
+            <name>fs.azure.custom.token.file.cache.path</name>
+            <value>/tmp/.azure</value>
+        </property>
+        <property>
+            <name>hive.metastore.metrics.enabled</name>
+            <value>true</value>
+        </property>
+        <property>
+            <name>hive.metastore.server.max.threads</name>
+            <value>{{ .Values.metastore.server.maxThreads }}</value>
+        </property>
+        <property>
+            <name>hive.metastore.server.min.threads</name>
+            <value>{{ .Values.metastore.server.minThreads }}</value>
+        </property>
+        <property>
+            <name>datanucleus.connectionPool.maxPoolSize</name>
+            <value>{{ .Values.metastore.connectionPool.maxPoolSize }}</value>
+        </property>
+        {{- range $key, $val := .Values.hiveSiteExtra }}
+        <property>
+            <name>{{ $key }}</name>
+            <value>{{ $val }}</value>
+        </property>
+        {{- end }}
+    </configuration>
+
+  {{- if .Values.jmxPrometheus.enabled }}
+  config.yaml: |
+    rules:
+    - pattern: 'org.apache.hadoop.hive.metastore<tag0=([^,]+)><>([^:]+)'
+      name: hive_metastore_$2
+      labels:
+        service: "$1"
+    - pattern: ".*"
+  {{- end }}
+
+  hive-log4j2.properties: |
+    status = INFO
+    name = HiveLog4j2
+    packages = org.apache.hadoop.hive.ql.log
+
+    appenders = console
+    appender.console.type = Console
+    appender.console.name = STDOUT
+    appender.console.layout.type = PatternLayout
+    appender.console.layout.pattern = %d{ISO8601} %5p [%t] %c{2}: %m%n
+
+    rootLogger.level = INFO
+    rootLogger.appenderRefs = console
+    rootLogger.appenderRef.console.ref = STDOUT
+
+    logger.DataNucleus.name = DataNucleus
+    logger.DataNucleus.level = ERROR
+
+    logger.Datastore.name = Datastore
+    logger.Datastore.level = ERROR
+
+    logger.Datastore_Schema.name = Datastore.Schema
+    logger.Datastore_Schema.level = ERROR
+
+    logger.JPOX.name = JPOX
+    logger.JPOX.level = ERROR

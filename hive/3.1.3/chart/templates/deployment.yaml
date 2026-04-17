@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hive-metastore.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hive-metastore.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    {{- toYaml .Values.strategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "hive-metastore.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "hive-metastore.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if .Values.jmxPrometheus.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ include "hive-metastore.jmx.port" . | quote }}
+        prometheus.io/path: "/metrics"
+        {{- end }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: hive-metastore
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: SERVICE_OPTS
+              value: "-Xmx{{ .Values.jvm.maxHeap }}{{ if .Values.jmxPrometheus.enabled }} -javaagent:{{ include "hive-metastore.jmx.agentJar" . }}={{ include "hive-metastore.jmx.port" . }}:{{ include "hive-metastore.jmx.configPath" . }}{{ end }}"
+          ports:
+            - name: thrift
+              containerPort: {{ .Values.service.port }}
+            {{- if .Values.jmxPrometheus.enabled }}
+            - name: metrics
+              containerPort: {{ include "hive-metastore.jmx.port" . }}
+            {{- end }}
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          volumeMounts:
+            - name: hive-config
+              mountPath: /opt/hive/conf/hive-site.xml
+              subPath: hive-site.xml
+              readOnly: true
+            {{- if .Values.jmxPrometheus.enabled }}
+            - name: hive-config
+              mountPath: {{ include "hive-metastore.jmx.configPath" . }}
+              subPath: config.yaml
+              readOnly: true
+            {{- end }}
+            - name: hive-config
+              mountPath: /opt/hive/conf/hive-log4j2.properties
+              subPath: hive-log4j2.properties
+              readOnly: true
+      volumes:
+        - name: hive-config
+          configMap:
+            name: {{ include "hive-metastore.fullname" . }}-config
