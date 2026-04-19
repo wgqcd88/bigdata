@@ -1,0 +1,24 @@
+{{- if .Values.historyServer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-history
+  namespace: {{ include "spark.namespace" . }}
+  labels:
+    {{- include "spark.labels" . | nindent 4 }}
+  {{- with .Values.historyServer.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.historyServer.service.type }}
+  {{- if .Values.historyServer.service.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.historyServer.service.loadBalancerIP }}
+  {{- end }}
+  selector:
+    app: spark-history
+  ports:
+    - protocol: TCP
+      port: {{ .Values.historyServer.service.port }}
+      targetPort: {{ .Values.historyServer.uiPort }}
+{{- end }}

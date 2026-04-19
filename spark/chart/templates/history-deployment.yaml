@@ -1,0 +1,68 @@
+{{- if .Values.historyServer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spark-history
+  namespace: {{ include "spark.namespace" . }}
+  labels:
+    {{- include "spark.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spark-history
+  template:
+    metadata:
+      labels:
+        app: spark-history
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.historyServer.uiPort }}"
+        prometheus.io/path: "/metrics/prometheus"
+    spec:
+      securityContext:
+        runAsUser: 185
+        runAsGroup: 0
+        fsGroup: 0
+      {{- with .Values.historyServer.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: spark-history
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          command: ["/opt/spark/sbin/start-history-server.sh"]
+          env:
+            - name: TZ
+              value: {{ .Values.timezone | quote }}
+            - name: SPARK_NO_DAEMONIZE
+              value: "1"
+            - name: SPARK_DAEMON_MEMORY
+              value: {{ .Values.historyServer.daemonMemory | quote }}
+          ports:
+            - name: spark-history
+              containerPort: {{ .Values.historyServer.uiPort }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.historyServer.uiPort }}
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: {{ .Values.historyServer.uiPort }}
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          {{- with .Values.historyServer.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - mountPath: "/opt/spark/conf"
+              name: spark-history-volume
+      volumes:
+        - name: spark-history-volume
+          configMap:
+            name: spark-history-defaults
+{{- end }}

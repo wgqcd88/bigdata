@@ -1,0 +1,17 @@
+{{- if .Values.historyServer.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spark-history-defaults
+  namespace: {{ include "spark.namespace" . }}
+  labels:
+    {{- include "spark.labels" . | nindent 4 }}
+data:
+  spark-defaults.conf: |
+    {{- range $key, $val := .Values.azureStorageAuth }}
+    {{ $key }}    {{ $val }}
+    {{- end }}
+    {{- range $key, $val := .Values.historyServer.sparkConf }}
+    {{ $key }}    {{ $val }}
+    {{- end }}
+{{- end }}

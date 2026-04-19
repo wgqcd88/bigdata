@@ -1,0 +1,29 @@
+{{- if .Values.thriftServer.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: spark-thrift-server
+  namespace: {{ include "spark.namespace" . }}
+  labels:
+    {{- include "spark.labels" . | nindent 4 }}
+  {{- with .Values.thriftServer.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.thriftServer.service.type }}
+  {{- if .Values.thriftServer.service.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.thriftServer.service.loadBalancerIP }}
+  {{- end }}
+  selector:
+    app: spark-thrift-server
+  ports:
+    - name: thrift-server
+      protocol: TCP
+      port: {{ .Values.thriftServer.ports.thrift }}
+      targetPort: {{ .Values.thriftServer.ports.thrift }}
+    - name: driver-ui
+      protocol: TCP
+      port: {{ .Values.thriftServer.ports.driverUi }}
+      targetPort: {{ .Values.thriftServer.ports.driverUi }}
+{{- end }}

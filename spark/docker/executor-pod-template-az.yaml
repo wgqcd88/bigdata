@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+spec:
+  affinity:
+    podAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: spark-role
+                  operator: In
+                  values:
+                    - executor   # 👈 关键
+            matchLabelKeys:
+              - spark-app-selector
+            topologyKey: topology.kubernetes.io/zone
