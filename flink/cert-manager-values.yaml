@@ -1,0 +1,17 @@
+replicaCount: 2
+
+extraArgs:
+  - --concurrent-workers=20
+  - --kube-api-qps=80
+  - --kube-api-burst=160
+
+webhook:
+  replicaCount: 2
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    cpu: 1
+    memory: 1Gi

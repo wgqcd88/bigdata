@@ -1,0 +1,11 @@
+defaultConfiguration:
+  kubernetes.operator.reconcile.interval: 15 s
+  kubernetes.operator.reconcile.parallelism: 16
+  kubernetes.operator.kubernetes.client.qps: 50
+  kubernetes.operator.kubernetes.client.burst: 100
+  kubernetes.operator.job.upgrade.last-state.fallback.enabled: true
+  kubernetes.operator.observer.checkpoint.trigger-grace-period: 120s
+watchNamespaces:
+  - flink-prod
+operatorPod:
+  jvmArgs: "-Xms1g -Xmx1g -XX:+UseG1GC"
