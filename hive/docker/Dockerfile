@@ -23,6 +23,9 @@ COPY --from=builder /opt/postgresql.jar /opt/hive/lib/postgresql.jar
 COPY --from=builder /opt/mysql-connector-j-8.4.0.jar /opt/hive/lib/mysql-connector-j-8.4.0.jar
 COPY com.github.azure.hadoop.custom.auth-1.3.jar /opt/hive/lib/com.github.azure.hadoop.custom.auth-1.3.jar
 COPY hadoop-azure-v6-3.3.6.jar /opt/hadoop/share/hadoop/common/lib/hadoop-azure-3.3.6.jar
+RUN mkdir -p /opt/jmx/ && \
+  curl -Lo /opt/jmx/jmx_prometheus_isolator_javaagent-1.5.0.jar  https://github.com/prometheus/jmx_exporter/releases/download/1.5.0/jmx_prometheus_isolator_javaagent-1.5.0.jar && \
+  curl -Lo /opt/jmx/jmx_prometheus_javaagent-1.5.0.jar  https://github.com/prometheus/jmx_exporter/releases/download/1.5.0/jmx_prometheus_javaagent-1.5.0.jar
 # Install dependencies
 RUN set -ex; \
     apt-get update; \
@@ -34,19 +37,7 @@ ENV HADOOP_HOME=/opt/hadoop \
     HIVE_VER=$HIVE_VERSION
 
 ENV PATH=$HIVE_HOME/bin:$HADOOP_HOME/bin:$PATH
-RUN cat > /entrypoint.sh <<'EOF'
-#!/bin/bash
-set -x
-export HIVE_CONF_DIR=$HIVE_HOME/conf
-if [ -d "${HIVE_CUSTOM_CONF_DIR:-}" ]; then
-  find "${HIVE_CUSTOM_CONF_DIR}" -type f -exec \
-    ln -sfn {} "${HIVE_CONF_DIR}"/ \;
-  export HADOOP_CONF_DIR=$HIVE_CONF_DIR
-fi
-export HADOOP_CLIENT_OPTS="$HADOOP_CLIENT_OPTS -Xmx1G $SERVICE_OPTS"
-export METASTORE_PORT=${METASTORE_PORT:-9083}
-exec $HIVE_HOME/bin/hive --skiphadoopversion --skiphbasecp --service metastore
-EOF
+ADD entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 ARG UID=1000
 RUN adduser --no-create-home --disabled-login --gecos "" --uid $UID hive && \

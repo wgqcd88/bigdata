@@ -64,16 +64,28 @@ readinessProbe:
 ## ---- Azure identity (used in hive-site.xml) ----
 database:
   driverName: "com.mysql.cj.jdbc.Driver"
-  url: "jdbc:mysql://wgq-mysql8-eastus2.mysql.database.azure.com:3306/hive_metastore_jw?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC&characterEncoding=UTF-8&rewriteBatchedStatements=true&connectTimeout=10000&socketTimeout=60000"
-  username: "azureuser"
-  password: "P@ssword123!"
+  url: "<JDBC_CONNECTION_URL>"
+  username: "<DB_USERNAME>"
+  password: "<DB_PASSWORD>"
 
 ## ---- Azure identity (used in hive-site.xml) ----
 azure:
-  clientId: "8a0f27e6-9100-48b0-bbc1-75a9f063bf48"
-  tenantId: "16b3c013-d300-468d-ac64-7eda0820b6d3"
+  clientId: "<AZURE_CLIENT_ID>"
+  tenantId: "<AZURE_TENANT_ID>"
   hnsEnabled: "true"
-  fnsServiceType: "DFS"
+
+
+## ---- Schema initialization Job (runs schematool against the metastore DB) ----
+schemaInit:
+  enabled: true
+  dbType: "mysql"
+  upgradeSchema: false
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
 
 ## ---- Hive Metastore tuning ----
 metastore:
