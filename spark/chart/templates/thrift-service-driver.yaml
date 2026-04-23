@@ -5,11 +5,13 @@ metadata:
   name: spark-thrift-driver
   namespace: {{ include "spark.namespace" . }}
   labels:
-    {{- include "spark.labels" . | nindent 4 }}
+    {{- include "spark.thrift.labels" . | nindent 4 }}
 spec:
   type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
   selector:
-    app: spark-thrift-server
+    {{- include "spark.thrift.selectorLabels" . | nindent 4 }}
   ports:
     - name: driver-rpc
       protocol: TCP

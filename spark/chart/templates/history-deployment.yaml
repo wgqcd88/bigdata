@@ -5,20 +5,20 @@ metadata:
   name: spark-history
   namespace: {{ include "spark.namespace" . }}
   labels:
-    {{- include "spark.labels" . | nindent 4 }}
+    {{- include "spark.history.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: spark-history
+      {{- include "spark.history.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: spark-history
+        {{- include "spark.history.selectorLabels" . | nindent 8 }}
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "{{ .Values.historyServer.uiPort }}"
-        prometheus.io/path: "/metrics/prometheus"
+        prometheus.io/path: "/metrics/prometheus/"
     spec:
       securityContext:
         runAsUser: 185
@@ -28,9 +28,14 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: spark-history
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/opt/spark/sbin/start-history-server.sh"]
           env:
             - name: TZ

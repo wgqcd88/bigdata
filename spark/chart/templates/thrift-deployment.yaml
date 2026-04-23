@@ -5,20 +5,20 @@ metadata:
   name: spark-thrift-server
   namespace: {{ include "spark.namespace" . }}
   labels:
-    {{- include "spark.labels" . | nindent 4 }}
+    {{- include "spark.thrift.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: spark-thrift-server
+      {{- include "spark.thrift.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        app: spark-thrift-server
+        {{- include "spark.thrift.selectorLabels" . | nindent 8 }}
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "{{ .Values.thriftServer.ports.driverUi }}"
-        prometheus.io/path: "/metrics/prometheus"
+        prometheus.io/path: "/metrics/prometheus/"
     spec:
       securityContext:
         runAsUser: 185
@@ -28,10 +28,15 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       serviceAccountName: {{ .Values.serviceAccount.name }}
       containers:
         - name: spark-thrift-server
           image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["/opt/spark/sbin/start-thriftserver.sh"]
           env:
             - name: SPARK_USER
@@ -52,7 +57,7 @@ spec:
                   fieldPath: status.podIP
           ports:
             - name: spark-thrift
-              containerPort: 10000
+              containerPort: {{ .Values.thriftServer.ports.thrift }}
             - name: driver-ui
               containerPort: {{ .Values.thriftServer.ports.driverUi }}
             - name: driver-rpc
@@ -61,12 +66,12 @@ spec:
               containerPort: {{ .Values.thriftServer.ports.blockManager }}
           livenessProbe:
             tcpSocket:
-              port: 10000
+              port: {{ .Values.thriftServer.ports.thrift }}
             initialDelaySeconds: 60
             periodSeconds: 30
           readinessProbe:
             tcpSocket:
-              port: 10000
+              port: {{ .Values.thriftServer.ports.thrift }}
             initialDelaySeconds: 30
             periodSeconds: 10
           {{- with .Values.thriftServer.resources }}
@@ -76,13 +81,8 @@ spec:
           volumeMounts:
             - mountPath: "/opt/spark/conf"
               name: spark-thrift-server-volume
-            - mountPath: "/opt/template"
-              name: executor-template
       volumes:
         - name: spark-thrift-server-volume
           configMap:
             name: spark-thrift-defaults
-        - name: executor-template
-          configMap:
-            name: spark-executor-template
 {{- end }}

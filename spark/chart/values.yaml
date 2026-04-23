@@ -3,6 +3,8 @@ namespace: spark
 image:
   repository: ghcr.io/wgqcd88/spark
   tag: "3.5.4-2026041416"
+  pullPolicy: IfNotPresent
+  pullSecrets: []
 
 timezone: Asia/Shanghai
 
@@ -28,9 +30,43 @@ azureStorageAuth:
   "spark.kubernetes.executor.volumes.hostPath.data.options.path":  "/tmp"
   "spark.kubernetes.executor.volumes.hostPath.data.options.type":  "DirectoryOrCreate"
   "spark.hadoop.fs.azure.account.hns.enabled":                   "true"
+
+
+# ── Common Spark Configuration (shared by thrift / history / client) ─
+# Keys here can be overridden by thriftServer.sparkConf / historyServer.sparkConf / client.sparkConf
+commonSparkConf:
+  # ── Event Log ──
+  "spark.eventLog.enabled":                                      "true"
+  "spark.eventLog.rolling.enabled":                              "true"
+  "spark.eventLog.rolling.maxFileSize":                          "128m"
   "spark.eventLog.dir":                                          "<your-eventlog-abfs-path>"
   "spark.history.fs.logDirectory":                               "<your-eventlog-abfs-path>"
-  
+  # ── Decommission fallback storage (shared path) ──
+  "spark.storage.decommission.fallbackStorage.path":             "<your-decommission-abfs-path>"
+  # ── SQL / Hive ──
+  "spark.sql.catalogImplementation":                             "hive"
+  "spark.sql.shuffle.partitions":                                "200"
+  "spark.sql.adaptive.enabled":                                  "true"
+  "spark.sql.adaptive.coalescePartitions.enabled":               "true"
+  "spark.sql.adaptive.skewJoin.enabled":                         "true"
+  "spark.sql.warehouse.dir":                                     "<your-warehouse-abfs-path>"
+  "spark.hadoop.hive.metastore.uris":                            "<your-hive-metastore-uri>"
+  # ── Speculation ──
+  "spark.speculation":                                           "true"
+  "spark.speculation.interval":                                  "60000ms"
+  "spark.speculation.multiplier":                                "2"
+  "spark.speculation.quantile":                                  "0.95"
+  # ── Dynamic Allocation (shared toggles; numeric sizes per workload) ──
+  "spark.dynamicAllocation.enabled":                             "true"
+  "spark.dynamicAllocation.shuffleTracking.enabled":             "true"
+  # ── Metrics (servlet class/path are identical; namespace differs per workload) ──
+  "spark.ui.prometheus.enabled":                                 "true"
+  "spark.metrics.conf.*.sink.prometheusServlet.class":           "org.apache.spark.metrics.sink.PrometheusServlet"
+  "spark.metrics.conf.*.sink.prometheusServlet.path":            "/metrics/prometheus"
+  "spark.metrics.conf.*.source.jvm.class":                       "org.apache.spark.metrics.source.JvmSource"
+  # ── JVM GC opts (driver & executor share) ──
+  "spark.driver.extraJavaOptions":                               "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+  "spark.executor.extraJavaOptions":                             "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
 # ── Spark Thrift Server ──────────────────────────────────────────
 thriftServer:
@@ -41,8 +77,11 @@ thriftServer:
 
   resources:
     requests:
-      memory: "4Gi"
+      memory: "6Gi"
       cpu: "1"
+    limits:
+      memory: "6Gi"
+      cpu: "2"
 
   ports:
     thrift: 10000
@@ -61,13 +100,11 @@ thriftServer:
     # ── Cluster ──
     "spark.master":                                                "k8s://https://kubernetes.default.svc"
     "spark.submit.deployMode":                                     "client"
-    "spark.kubernetes.executor.node.selector.spark-executor":      "support"
     "spark.kubernetes.driver.annotation.cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
     "spark.kubernetes.driver.ownPodAsOwnerReference":              "true"
     # ── Driver ──
     "spark.driver.cores":                                          "1"
     "spark.driver.memory":                                         "4g"
-    "spark.driver.extraJavaOptions":                               "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
     "spark.driver.port":                                           "7078"
     "spark.driver.blockManager.port":                              "7079"
     "spark.driver.bindAddress":                                    "0.0.0.0"
@@ -76,47 +113,33 @@ thriftServer:
     "spark.executor.cores":                                        "1"
     "spark.executor.memory":                                       "4g"
     "spark.executor.memoryOverhead":                               "1g"
-    "spark.executor.extraJavaOptions":                             "-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
     "spark.executor.heartbeatInterval":                            "60s"
-    # ── Dynamic Allocation ──
-    "spark.dynamicAllocation.enabled":                             "true"
-    "spark.dynamicAllocation.shuffleTracking.enabled":             "true"
+    # ── Dynamic Allocation (sizing specific to thrift) ──
     "spark.dynamicAllocation.initialExecutors":                    "5"
     "spark.dynamicAllocation.minExecutors":                        "0"
     "spark.dynamicAllocation.maxExecutors":                        "20"
-    "spark.dynamicAllocation.executorIdleTimeout":                 "600s"
+    "spark.dynamicAllocation.executorIdleTimeout":                 "60s"
+    "spark.dynamicAllocation.cachedExecutorIdleTimeout":           "300s"
+    "spark.dynamicAllocation.shuffleTracking.timeout":             "300s"
+    "spark.kubernetes.executor.deleteOnTermination":               "true"
     "spark.kubernetes.executor.allocationBatchSize":               "20"
     "spark.kubernetes.executor.allocationBatchDelay":              "5s"
-    # ── SQL / Hive ──
-    "spark.sql.catalogImplementation":                             "hive"
-    "spark.sql.warehouse.dir":                                     "<your-warehouse-abfs-path>"
-    "spark.sql.shuffle.partitions":                                "200"
-    "spark.sql.adaptive.enabled":                                  "true"
-    "spark.sql.adaptive.coalescePartitions.enabled":               "true"
-    "spark.sql.adaptive.skewJoin.enabled":                         "true"
-    "spark.hadoop.hive.metastore.uris":                            "<your-hive-metastore-uri>"
+    # ── SQL / Hive (thrift-specific) ──
     "spark.hiveconf.hive.server2.thrift.port":                     "10000"
     "spark.hiveconf.hive.server2.thrift.bind.host":                "0.0.0.0"
-    # ── Event Log ──
-    "spark.eventLog.enabled":                                      "true"
-    "spark.eventLog.rolling.enabled":                              "true"
-    "spark.eventLog.rolling.maxFileSize":                          "128m"
     # ── Network ──
     "spark.network.timeout":                                       "800s"
-    # ── Speculation ──
-    "spark.speculation":                                           "true"
-    "spark.speculation.interval":                                   "60000ms"
-    "spark.speculation.multiplier":                                 "2"
-    "spark.speculation.quantile":                                   "0.95"
-    # ── Metrics ──
-    "spark.ui.prometheus.enabled":                                 "true"
+    # ── Metrics (namespace specific to thrift) ──
+    "spark.metrics.namespace":                                     "spark_thrift"
     # ── Executor Pod Template ──
     "spark.kubernetes.executor.podTemplateFile":                    "/opt/template/executor-pod-template.yaml"
     # ── Decommission ──
     "spark.decommission.enabled":                                  "true"
+    "spark.storage.decommission.enabled":                          "true"
     "spark.storage.decommission.rddBlocks.enabled":                "true"
     "spark.storage.decommission.shuffleBlocks.enabled":            "true"
-    "spark.storage.decommission.fallbackStorage.path":             ""
+    "spark.storage.decommission.shuffleBlocks.maxThreads":         "8"
+    "spark.storage.decommission.fallbackStorage.cleanUp":          "true"
     "spark.decommission.timeout":                                  "3600s"
 
 # ── Spark History Server ─────────────────────────────────────────
@@ -124,10 +147,13 @@ historyServer:
   enabled: true
 
   nodeSelector:
-    spark-history: "support"
+    spark-history-server: "support"
 
   resources:
     requests:
+      memory: "8Gi"
+      cpu: "2"
+    limits:
       memory: "8Gi"
       cpu: "2"
 
@@ -144,10 +170,67 @@ historyServer:
   # spark-defaults.conf (image auto-injected)
   sparkConf:
     "spark.history.ui.port":                                       "18080"
-    # ── Metrics ──
-    "spark.ui.prometheus.enabled":                                 "true"
     "spark.history.fs.cleaner.enabled":                            "true"
     "spark.history.fs.cleaner.maxAge":                             "30d"
     "spark.history.retainedApplications":                          "10000"
-    "spark.eventLog.enabled":                                      "true"
+
+# ── Spark Client (external spark-submit / spark-shell) ───────────
+# Generates ConfigMap spark-client-defaults; export to local spark/conf via scripts/export-client-conf.sh
+client:
+  enabled: true
+
+  # spark-defaults.conf for external clients (image/namespace/serviceAccount auto-injected)
+  sparkConf:
+    # ── Cluster (external API server; override via values-<env>.yaml) ──
+    "spark.master":                                                "k8s://<your-external-k8s-api-url>"
+    "spark.submit.deployMode":                                     "cluster"
+    # ── Driver (exposed via LoadBalancer so external executors can reach it) ──
+    "spark.kubernetes.driver.service.type":                        "LoadBalancer"
+    "spark.kubernetes.driver.annotation.service.beta.kubernetes.io/azure-load-balancer-internal": "true"
+    "spark.kubernetes.driver.annotation.cluster-autoscaler.kubernetes.io/safe-to-evict": "false"
+    "spark.kubernetes.driver.ownPodAsOwnerReference":              "true"
+    "spark.executor.cores":                                         "1"
+    "spark.driver.memory":                                         "4g"
+    "spark.driver.maxResultSize":                                  "4G"
+    # ── Executor ──
+    "spark.executor.cores":                                        "1"
+    "spark.executor.memory":                                       "4g"
+    "spark.executor.memoryOverhead":                               "4096m"
+    # ── Node Selectors (client jobs run on user pool) ──
+    # "spark.kubernetes.driver.node.selector.agentpool":             "userpool"
+    # "spark.kubernetes.executor.node.selector.agentpool":           "userpool"
+    # ── Labels for discovery ──
+    # "spark.kubernetes.driver.label.app":                           "spark-pi"
+    # "spark.kubernetes.executor.label.app":                         "spark-executor"
+    # ── Dynamic Allocation sizing ──
+    "spark.dynamicAllocation.initialExecutors":                    "5"
+    "spark.dynamicAllocation.minExecutors":                        "0"
+    "spark.dynamicAllocation.maxExecutors":                        "20"
+    "spark.dynamicAllocation.executorIdleTimeout":                 "100s"
+    "spark.kubernetes.executor.allocationBatchSize":               "20"
+    "spark.kubernetes.executor.allocationBatchDelay":              "5s"
+    # ── SQL / Hive (client-specific) ──
+    "spark.sql.cbo.enabled":                                       "false"
+    "spark.sql.cbo.joinReorder.enabled":                           "true"
+    # ── Hadoop (Hive/output committer tunings) ──
+    "spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version": "2"
+    "spark.hadoop.hive.exec.dynamic.partition":                    "true"
+    "spark.hadoop.hive.exec.dynamic.partition.mode":               "nonstrict"
+    "spark.hadoop.fs.azure.readaheadqueue.depth":                  "0"
+    # ── Metrics ──
+    "spark.metrics.namespace":                                     "spark"
+    "spark.kubernetes.driver.annotation.prometheus.io/scrape":     "true"
+    "spark.kubernetes.driver.annotation.prometheus.io/port":       "4040"
+    "spark.kubernetes.driver.annotation.prometheus.io/path":       "/metrics/prometheus"
+    "spark.metrics.namespace":                                     "spark_driver"
+    # ── Executor Pod Template (relative path; maintained manually in spark/conf/) ──
+    "spark.kubernetes.executor.podTemplateFile":                   "/opt/template/executor-pod-template.yaml"
+    "spark.decommission.enabled":                                  "true"
+    "spark.storage.decommission.enabled":                          "true"
+    "spark.storage.decommission.rddBlocks.enabled":                "true"
+    "spark.storage.decommission.shuffleBlocks.enabled":            "true"
+    "spark.storage.decommission.shuffleBlocks.maxThreads":         "8"
+    # "spark.storage.decommission.fallbackStorage.path":             "abfs://<>@<account_name>.dfs.core.windows.net/xx"
+    "spark.storage.decommission.fallbackStorage.cleanUp":          "true"
+    "spark.decommission.timeout":                                  "3600s"
 

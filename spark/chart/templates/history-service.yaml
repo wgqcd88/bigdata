@@ -5,7 +5,7 @@ metadata:
   name: spark-history
   namespace: {{ include "spark.namespace" . }}
   labels:
-    {{- include "spark.labels" . | nindent 4 }}
+    {{- include "spark.history.labels" . | nindent 4 }}
   {{- with .Values.historyServer.service.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -16,7 +16,7 @@ spec:
   loadBalancerIP: {{ .Values.historyServer.service.loadBalancerIP }}
   {{- end }}
   selector:
-    app: spark-history
+    {{- include "spark.history.selectorLabels" . | nindent 4 }}
   ports:
     - protocol: TCP
       port: {{ .Values.historyServer.service.port }}

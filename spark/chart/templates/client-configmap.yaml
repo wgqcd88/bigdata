@@ -1,25 +1,25 @@
-{{- if .Values.thriftServer.enabled }}
+{{- if .Values.client.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: spark-thrift-defaults
+  name: spark-client-defaults
   namespace: {{ include "spark.namespace" . }}
   labels:
     {{- include "spark.labels" . | nindent 4 }}
+    app.kubernetes.io/component: client
 data:
   spark-defaults.conf: |
-    spark.kubernetes.authenticate.driver.serviceAccountName     {{ .Values.serviceAccount.name }}
-    spark.kubernetes.authenticate.executor.serviceAccountName   {{ .Values.serviceAccount.name }}
     spark.kubernetes.container.image                            {{ .Values.image.repository }}:{{ .Values.image.tag }}
     spark.kubernetes.namespace                                  {{ include "spark.namespace" . }}
-    spark.driver.host                                           spark-thrift-driver.{{ include "spark.namespace" . }}.svc
+    spark.kubernetes.authenticate.driver.serviceAccountName     {{ .Values.serviceAccount.name }}
+    spark.kubernetes.authenticate.executor.serviceAccountName   {{ .Values.serviceAccount.name }}
     {{- range $key, $val := .Values.azureStorageAuth }}
     {{ $key }}    {{ $val }}
     {{- end }}
     {{- range $key, $val := .Values.commonSparkConf }}
     {{ $key }}    {{ $val }}
     {{- end }}
-    {{- range $key, $val := .Values.thriftServer.sparkConf }}
+    {{- range $key, $val := .Values.client.sparkConf }}
     {{ $key }}    {{ $val }}
     {{- end }}
 {{- end }}

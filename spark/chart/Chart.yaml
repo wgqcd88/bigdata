@@ -2,5 +2,5 @@ apiVersion: v2
 name: spark
 description: Spark on Kubernetes - Thrift Server & History Server
 type: application
-version: 0.1.0
+version: 3.5.4-20260423
 appVersion: "3.5.4"

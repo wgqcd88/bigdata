@@ -11,6 +11,9 @@ data:
     {{- range $key, $val := .Values.azureStorageAuth }}
     {{ $key }}    {{ $val }}
     {{- end }}
+    {{- range $key, $val := .Values.commonSparkConf }}
+    {{ $key }}    {{ $val }}
+    {{- end }}
     {{- range $key, $val := .Values.historyServer.sparkConf }}
     {{ $key }}    {{ $val }}
     {{- end }}
