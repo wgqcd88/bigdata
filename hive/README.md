@@ -10,6 +10,8 @@ az acr import -n <acr_name> \
 image:
   repository: <acr_name>.azurecr.io/azure/hive-metastore
   tag: 3.1.3-20260407
+  pullSecrets:
+    - name: image_pull
 nodeSelector: 
   hive-metastore: support
 database:
@@ -25,5 +27,5 @@ azure:
 helm upgrade --install hive-metastore  \
 	-n hive --create-namespace  \
 	oci://ghcr.io/wgqcd88/charts/hive-metastore \
-	--version 3.1.3-20260423 
+	--version 3.1.3-2026042317 
 ```

@@ -57,6 +57,10 @@ spec:
         job: schema-init
     spec:
       restartPolicy: OnFailure
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
