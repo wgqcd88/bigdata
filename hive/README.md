@@ -10,7 +10,8 @@ az acr import -n <acr_name> \
 image:
   repository: <acr_name>.azurecr.io/azure/hive-metastore
   tag: 3.1.3-20260407
-nodeSelector: {}
+nodeSelector: 
+  hive-metastore: support
 database:
   url: "jdbc:mysql://<mysql_host>:3306/<database_name>?createDatabaseIfNotExist=true&useSSL=true&requireSSL=true&serverTimezone=UTC&characterEncoding=UTF-8&rewriteBatchedStatements=true&connectTimeout=10000&socketTimeout=60000"
   username: "<dababase_username>"
@@ -24,5 +25,5 @@ azure:
 helm upgrade --install hive-metastore  \
 	-n hive --create-namespace  \
 	oci://ghcr.io/wgqcd88/charts/hive-metastore \
-	--version 3.1.3-20260419 
+	--version 3.1.3-20260423 
 ```
