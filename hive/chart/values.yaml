@@ -26,6 +26,15 @@ strategy:
 ## Node selector
 nodeSelector: {}
 
+## Tolerations
+## Example:
+##   tolerations:
+##     - key: "dedicated"
+##       operator: "Equal"
+##       value: "hive"
+##       effect: "NoSchedule"
+tolerations: []
+
 affinity:
   podAntiAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:

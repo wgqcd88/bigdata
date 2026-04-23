@@ -5,8 +5,9 @@ az acr import -n <acr_name> \
 	--image azure/hive-metastore:3.1.3-20260407 
 ```
 
-### 创建helm values.yaml
+### 创建 helm hive-metastore-values.yaml
 ```
+namespace: hive
 image:
   repository: <acr_name>.azurecr.io/azure/hive-metastore
   tag: 3.1.3-20260407
@@ -27,5 +28,6 @@ azure:
 helm upgrade --install hive-metastore  \
 	-n hive --create-namespace  \
 	oci://ghcr.io/wgqcd88/charts/hive-metastore \
-	--version 3.1.3-2026042317 
+	--version 3.1.3-2026042321 \
+  -f hive-metastore-values.yaml
 ```

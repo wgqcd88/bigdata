@@ -2,5 +2,5 @@ apiVersion: v2
 name: hive-metastore
 description: Apache Hive Metastore Helm chart
 type: application
-version: 3.1.3-20260423
+version: 3.1.3-2026042317
 appVersion: "3.1.3"
