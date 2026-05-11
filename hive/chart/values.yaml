@@ -121,6 +121,9 @@ metastore:
     minThreads: "50"
   connectionPool:
     maxPoolSize: "30"
+  metrics:
+    enabled: true
+    reporter: "JMX"
 
 ## ---- Hive-site.xml extra fixed properties ----
 ## Override or append additional <property> blocks in hive-site.xml.

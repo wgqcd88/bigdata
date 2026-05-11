@@ -28,6 +28,6 @@ azure:
 helm upgrade --install hive-metastore  \
 	-n hive --create-namespace  \
 	oci://ghcr.io/wgqcd88/charts/hive-metastore \
-	--version 3.1.3-2026042321 \
+	--version 3.1.3-20260511 \
   -f hive-metastore-values.yaml
 ```

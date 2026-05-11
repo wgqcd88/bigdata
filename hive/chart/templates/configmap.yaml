@@ -102,17 +102,23 @@ data:
             <value>com.github.azure.hadoop.custom.auth.MSIFileCachedAccessTokenProvider</value>
         </property>
         <property>
-            <name>hive.metastore.uri</name>
+            <name>hive.metastore.uris</name>
             <value>thrift://{{ include "hive-metastore.fullname" . }}.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.service.port }}</value>
         </property>
         <property>
             <name>fs.azure.custom.token.file.cache.path</name>
             <value>/tmp/.azure</value>
         </property>
+        {{- if .Values.metastore.metrics.enabled }}
         <property>
             <name>hive.metastore.metrics.enabled</name>
             <value>true</value>
         </property>
+        <property>
+            <name>hive.service.metrics.reporter</name>
+            <value>{{ .Values.metastore.metrics.reporter }}</value>
+        </property>
+        {{- end }}
         <property>
             <name>hive.metastore.server.max.threads</name>
             <value>{{ .Values.metastore.server.maxThreads }}</value>
