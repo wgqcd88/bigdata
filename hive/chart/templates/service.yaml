@@ -13,6 +13,7 @@ spec:
   type: {{ .Values.service.type }}
   selector:
     {{- include "hive-metastore.selectorLabels" . | nindent 4 }}
+    component: hive-metastore
   ports:
     - protocol: TCP
       port: {{ .Values.service.port }}

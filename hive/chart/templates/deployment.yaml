@@ -12,10 +12,15 @@ spec:
   selector:
     matchLabels:
       {{- include "hive-metastore.selectorLabels" . | nindent 6 }}
+      component: hive-metastore
   template:
     metadata:
       labels:
         {{- include "hive-metastore.selectorLabels" . | nindent 8 }}
+        component: hive-metastore
+        {{- if .Values.azure.workloadIdentity.enabled }}
+        azure.workload.identity/use: "true"
+        {{- end }}
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
         {{- if .Values.jmxPrometheus.enabled }}
@@ -24,6 +29,9 @@ spec:
         prometheus.io/path: "/metrics"
         {{- end }}
     spec:
+      {{- if .Values.azure.workloadIdentity.enabled }}
+      serviceAccountName: {{ include "hive-metastore.serviceAccountName" . }}
+      {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}

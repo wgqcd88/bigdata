@@ -1,0 +1,131 @@
+{{- if .Values.mysql.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "hive-metastore.mysql.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hive-metastore.labels" . | nindent 4 }}
+    component: mysql
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: {{ .Values.mysql.rootPassword | quote }}
+  MYSQL_DATABASE: {{ .Values.mysql.database | quote }}
+  MYSQL_USER: {{ .Values.mysql.user | quote }}
+  MYSQL_PASSWORD: {{ .Values.mysql.password | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hive-metastore.mysql.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hive-metastore.labels" . | nindent 4 }}
+    component: mysql
+spec:
+  type: ClusterIP
+  ports:
+    - name: mysql
+      port: {{ .Values.mysql.service.port }}
+      targetPort: mysql
+      protocol: TCP
+  selector:
+    {{- include "hive-metastore.selectorLabels" . | nindent 4 }}
+    component: mysql
+{{- if .Values.mysql.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hive-metastore.mysql.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hive-metastore.labels" . | nindent 4 }}
+    component: mysql
+spec:
+  accessModes:
+    {{- toYaml .Values.mysql.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.mysql.persistence.size | quote }}
+  {{- with .Values.mysql.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hive-metastore.mysql.fullname" . }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "hive-metastore.labels" . | nindent 4 }}
+    component: mysql
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "hive-metastore.selectorLabels" . | nindent 6 }}
+      component: mysql
+  template:
+    metadata:
+      labels:
+        {{- include "hive-metastore.selectorLabels" . | nindent 8 }}
+        component: mysql
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mysql.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mysql.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: mysql
+          image: "{{ .Values.mysql.image.repository }}:{{ .Values.mysql.image.tag }}"
+          imagePullPolicy: {{ .Values.mysql.image.pullPolicy }}
+          args:
+            - --max-connections={{ .Values.mysql.maxConnections | default 500 }}
+          envFrom:
+            - secretRef:
+                name: {{ include "hive-metastore.mysql.fullname" . }}
+          ports:
+            - name: mysql
+              containerPort: 3306
+          {{- with .Values.mysql.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            tcpSocket:
+              port: mysql
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - mysqladmin ping -uroot -p"$MYSQL_ROOT_PASSWORD"
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: data
+          {{- if .Values.mysql.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "hive-metastore.mysql.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

@@ -6,10 +6,12 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "hive-metastore.labels" . | nindent 4 }}
+  {{- if not .Values.mysql.enabled }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-10"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+  {{- end }}
 data:
   hive-site.xml: |
     <?xml version="1.0" encoding="UTF-8"?>
@@ -20,15 +22,15 @@ data:
         </property>
         <property>
             <name>javax.jdo.option.ConnectionURL</name>
-            <value>{{ .Values.database.url | replace "&" "&amp;" }}</value>
+            <value>{{ include "hive-metastore.database.url" . | replace "&" "&amp;" }}</value>
         </property>
         <property>
             <name>javax.jdo.option.ConnectionUserName</name>
-            <value>{{ .Values.database.username }}</value>
+            <value>{{ include "hive-metastore.database.username" . }}</value>
         </property>
         <property>
             <name>javax.jdo.option.ConnectionPassword</name>
-            <value>{{ .Values.database.password }}</value>
+            <value>{{ include "hive-metastore.database.password" . }}</value>
         </property>
         <property>
             <name>metastore.metastore.event.db.notification.api.auth</name>
@@ -43,10 +45,12 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     {{- include "hive-metastore.labels" . | nindent 4 }}
+  {{- if not .Values.mysql.enabled }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+  {{- end }}
 spec:
   backoffLimit: {{ .Values.schemaInit.backoffLimit }}
   ttlSecondsAfterFinished: {{ .Values.schemaInit.ttlSecondsAfterFinished }}
@@ -55,11 +59,40 @@ spec:
       labels:
         {{- include "hive-metastore.selectorLabels" . | nindent 8 }}
         job: schema-init
+        {{- if .Values.azure.workloadIdentity.enabled }}
+        azure.workload.identity/use: "true"
+        {{- end }}
     spec:
       restartPolicy: OnFailure
+      {{- if .Values.azure.workloadIdentity.enabled }}
+      serviceAccountName: {{ include "hive-metastore.serviceAccountName" . }}
+      {{- end }}
       {{- with .Values.image.pullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.mysql.enabled }}
+      initContainers:
+        - name: wait-for-mysql
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              host="{{ include "hive-metastore.mysql.fullname" . }}.{{ .Values.namespace }}.svc.cluster.local"
+              port={{ .Values.mysql.service.port }}
+              echo "Waiting for MySQL at ${host}:${port} ..."
+              i=0
+              until nc -z "${host}" "${port}"; do
+                i=$((i+1))
+                if [ "$i" -ge 120 ]; then
+                  echo "MySQL not ready after 120 attempts, giving up"
+                  exit 1
+                fi
+                sleep 2
+              done
+              echo "MySQL is reachable."
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

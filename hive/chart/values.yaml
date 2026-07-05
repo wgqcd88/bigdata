@@ -4,8 +4,8 @@ createNamespace: false
 
 ## Image
 image:
-  repository: wgqcd/hive-metastore
-  tag: "3.1.3-20260407"
+  repository: ghcr.io/wgqcd88/hive-metastore
+  tag: "3.1.3-20260705"
   pullPolicy: IfNotPresent
   ## Image pull secrets (reference existing secrets in the namespace)
   ## Example:
@@ -41,6 +41,7 @@ affinity:
       - labelSelector:
           matchLabels:
             app: hive-metastore
+            component: hive-metastore
         topologyKey: kubernetes.io/hostname
     preferredDuringSchedulingIgnoredDuringExecution:
       - weight: 100
@@ -48,6 +49,7 @@ affinity:
           labelSelector:
             matchLabels:
               app: hive-metastore
+              component: hive-metastore
           topologyKey: topology.kubernetes.io/zone
 ## Resources
 resources:
@@ -89,17 +91,73 @@ readinessProbe:
   failureThreshold: 3
 
 ## ---- Azure identity (used in hive-site.xml) ----
+## External database. Used when .Values.mysql.enabled is false; ignored otherwise
+## (the chart derives url/username/password from the embedded MySQL below).
 database:
   driverName: "com.mysql.cj.jdbc.Driver"
   url: "<JDBC_CONNECTION_URL>"
   username: "<DB_USERNAME>"
   password: "<DB_PASSWORD>"
 
+## ---- Embedded MySQL (single-replica, cluster-internal) ----
+## For dev / POC / small deployments. For production, use an external managed DB
+## and keep mysql.enabled=false.
+## When enabled=true, the chart:
+##   * renders a MySQL Deployment + Service + Secret (and optional PVC)
+##   * overrides database.url/username/password with values pointing at it
+##     (database.driverName is still honored)
+mysql:
+  enabled: false
+  image:
+    repository: mysql
+    tag: "8.0"
+    pullPolicy: IfNotPresent
+  ## Root password is required by the mysql image at first boot.
+  rootPassword: "hive-root"
+  ## Application user/db created automatically by the mysql image on first boot.
+  database: "metastore"
+  user: "hive"
+  password: "hive"
+  service:
+    port: 3306
+  ## Extra query args appended to the JDBC URL
+  jdbcParams: "useSSL=false&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true"
+  persistence:
+    enabled: true
+    size: "20Gi"
+    ## Leave empty to use the cluster default StorageClass
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+  nodeSelector: {}
+  tolerations: []
+
 ## ---- Azure identity (used in hive-site.xml) ----
 azure:
   clientId: "<AZURE_CLIENT_ID>"
   tenantId: "<AZURE_TENANT_ID>"
   hnsEnabled: "true"
+  ## Azure AD Workload Identity (AKS)
+  ## When enabled=true, fs.azure.account.auth.type is switched to OAuth and
+  ## the WorkloadIdentityTokenProvider from hadoop-azure is used instead of
+  ## the IMDS-based MSI provider. Requires the workload-identity mutating
+  ## webhook to be installed in the cluster (default in AKS >=1.24 with the
+  ## workload identity add-on enabled).
+  workloadIdentity:
+    enabled: false
+    serviceAccount:
+      ## When create=true, chart renders a ServiceAccount annotated for WI.
+      ## When create=false, an externally-managed SA is referenced by name.
+      create: true
+      ## SA name. Defaults to the chart fullname when empty.
+      name: ""
+      ## Extra annotations merged into the SA (azure.workload.identity/client-id
+      ## is added automatically from azure.clientId).
+      annotations: {}
 
 
 ## ---- Schema initialization Job (runs schematool against the metastore DB) ----

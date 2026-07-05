@@ -1,8 +1,8 @@
 ### 导入镜像到acr
 ```
 az acr import -n <acr_name> \
-	--source ghcr.io/wgqcd88/hive-metastore:3.1.3-20260407 \
-	--image azure/hive-metastore:3.1.3-20260407 
+	--source ghcr.io/wgqcd88/hive-metastore:3.1.3-20260705 \
+	--image azure/hive-metastore:3.1.3-20260705
 ```
 
 ### 创建 helm hive-metastore-values.yaml
@@ -10,7 +10,7 @@ az acr import -n <acr_name> \
 namespace: hive
 image:
   repository: <acr_name>.azurecr.io/azure/hive-metastore
-  tag: 3.1.3-20260407
+  tag: 3.1.3-20260705
   pullSecrets:
     - name: image_pull
 nodeSelector: 
@@ -28,6 +28,6 @@ azure:
 helm upgrade --install hive-metastore  \
 	-n hive --create-namespace  \
 	oci://ghcr.io/wgqcd88/charts/hive-metastore \
-	--version 3.1.3-20260511 \
+	--version 3.1.3-20260705 \
   -f hive-metastore-values.yaml
 ```
