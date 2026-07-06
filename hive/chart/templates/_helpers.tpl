@@ -64,7 +64,7 @@ verbatim.
 {{- define "hive-metastore.database.url" -}}
 {{- if .Values.mysql.enabled -}}
 {{- $host := include "hive-metastore.mysql.fullname" . -}}
-jdbc:mysql://{{ $host }}.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.mysql.service.port }}/{{ .Values.mysql.database }}?{{ .Values.mysql.jdbcParams }}
+jdbc:mysql://{{ $host }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.mysql.service.port }}/{{ .Values.mysql.database }}?{{ .Values.mysql.jdbcParams }}
 {{- else -}}
 {{ .Values.database.url }}
 {{- end -}}

@@ -3,7 +3,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: {{ include "hive-metastore.mysql.fullname" . }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "hive-metastore.labels" . | nindent 4 }}
     component: mysql
@@ -18,7 +18,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "hive-metastore.mysql.fullname" . }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "hive-metastore.labels" . | nindent 4 }}
     component: mysql
@@ -38,7 +38,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: {{ include "hive-metastore.mysql.fullname" . }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "hive-metastore.labels" . | nindent 4 }}
     component: mysql
@@ -57,7 +57,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "hive-metastore.mysql.fullname" . }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "hive-metastore.labels" . | nindent 4 }}
     component: mysql
