@@ -57,14 +57,48 @@ Embedded MySQL resource name
 {{- end -}}
 
 {{/*
-JDBC URL used by hive-site.xml. When mysql.enabled is true, the URL points at
-the in-cluster MySQL service; otherwise the external database.url is returned
-verbatim.
+Embedded PostgreSQL resource name
+*/}}
+{{- define "hive-metastore.postgresql.fullname" -}}
+{{ include "hive-metastore.fullname" . }}-postgresql
+{{- end -}}
+
+{{/*
+Guard: embedded MySQL and PostgreSQL cannot both be enabled.
+*/}}
+{{- define "hive-metastore.database.validate" -}}
+{{- if and .Values.mysql.enabled .Values.postgresql.enabled -}}
+{{- fail "mysql.enabled and postgresql.enabled are mutually exclusive; enable at most one embedded database." -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+JDBC driver name. Embedded DBs override the external database.driverName.
+*/}}
+{{- define "hive-metastore.database.driverName" -}}
+{{- include "hive-metastore.database.validate" . -}}
+{{- if .Values.mysql.enabled -}}
+com.mysql.cj.jdbc.Driver
+{{- else if .Values.postgresql.enabled -}}
+org.postgresql.Driver
+{{- else -}}
+{{ .Values.database.driverName }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+JDBC URL used by hive-site.xml. When mysql.enabled or postgresql.enabled is
+true, the URL points at the in-cluster service; otherwise the external
+database.url is returned verbatim.
 */}}
 {{- define "hive-metastore.database.url" -}}
+{{- include "hive-metastore.database.validate" . -}}
 {{- if .Values.mysql.enabled -}}
 {{- $host := include "hive-metastore.mysql.fullname" . -}}
 jdbc:mysql://{{ $host }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.mysql.service.port }}/{{ .Values.mysql.database }}?{{ .Values.mysql.jdbcParams }}
+{{- else if .Values.postgresql.enabled -}}
+{{- $host := include "hive-metastore.postgresql.fullname" . -}}
+jdbc:postgresql://{{ $host }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.postgresql.service.port }}/{{ .Values.postgresql.database }}{{ if .Values.postgresql.jdbcParams }}?{{ .Values.postgresql.jdbcParams }}{{ end }}
 {{- else -}}
 {{ .Values.database.url }}
 {{- end -}}
@@ -73,6 +107,8 @@ jdbc:mysql://{{ $host }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.m
 {{- define "hive-metastore.database.username" -}}
 {{- if .Values.mysql.enabled -}}
 {{ .Values.mysql.user }}
+{{- else if .Values.postgresql.enabled -}}
+{{ .Values.postgresql.user }}
 {{- else -}}
 {{ .Values.database.username }}
 {{- end -}}
@@ -81,7 +117,50 @@ jdbc:mysql://{{ $host }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.m
 {{- define "hive-metastore.database.password" -}}
 {{- if .Values.mysql.enabled -}}
 {{ .Values.mysql.password }}
+{{- else if .Values.postgresql.enabled -}}
+{{ .Values.postgresql.password }}
 {{- else -}}
 {{ .Values.database.password }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+schematool -dbType value. Embedded DBs pin it; otherwise honor schemaInit.dbType.
+*/}}
+{{- define "hive-metastore.schemaInit.dbType" -}}
+{{- if .Values.mysql.enabled -}}
+mysql
+{{- else if .Values.postgresql.enabled -}}
+postgres
+{{- else -}}
+{{ .Values.schemaInit.dbType }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+True when the schema-init Job should run as a helm hook (external DB only).
+When an embedded DB is used, the Job runs after the DB Deployment is up.
+*/}}
+{{- define "hive-metastore.schemaInit.useHook" -}}
+{{- if or .Values.mysql.enabled .Values.postgresql.enabled -}}false{{- else -}}true{{- end -}}
+{{- end -}}
+
+{{/*
+Embedded DB service host (FQDN inside the cluster). Empty for external DB —
+callers must decide how to wait for external DBs on their own.
+*/}}
+{{- define "hive-metastore.database.embedded.host" -}}
+{{- if .Values.mysql.enabled -}}
+{{ include "hive-metastore.mysql.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+{{- else if .Values.postgresql.enabled -}}
+{{ include "hive-metastore.postgresql.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+{{- end -}}
+{{- end -}}
+
+{{- define "hive-metastore.database.embedded.port" -}}
+{{- if .Values.mysql.enabled -}}
+{{ .Values.mysql.service.port }}
+{{- else if .Values.postgresql.enabled -}}
+{{ .Values.postgresql.service.port }}
 {{- end -}}
 {{- end -}}

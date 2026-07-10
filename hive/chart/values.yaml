@@ -103,8 +103,8 @@ database:
 ## and keep mysql.enabled=false.
 ## When enabled=true, the chart:
 ##   * renders a MySQL Deployment + Service + Secret (and optional PVC)
-##   * overrides database.url/username/password with values pointing at it
-##     (database.driverName is still honored)
+##   * overrides database.driverName/url/username/password with values pointing at it
+## mysql.enabled and postgresql.enabled are mutually exclusive.
 mysql:
   enabled: false
   image:
@@ -125,6 +125,46 @@ mysql:
     enabled: true
     size: "20Gi"
     ## Leave empty to use the cluster default StorageClass
+    storageClass: ""
+    accessModes:
+      - ReadWriteOnce
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+  nodeSelector: {}
+  tolerations: []
+
+## ---- Embedded PostgreSQL (single-replica, cluster-internal) ----
+## Same purpose as the embedded MySQL block above; use for dev / POC only.
+## When enabled=true, the chart:
+##   * renders a PostgreSQL Deployment + Service + Secret (and optional PVC)
+##   * overrides database.driverName/url/username/password with values pointing at it
+##   * forces schemaInit.dbType to "postgres"
+## mysql.enabled and postgresql.enabled are mutually exclusive.
+postgresql:
+  enabled: false
+  image:
+    repository: postgres
+    tag: "16"
+    pullPolicy: IfNotPresent
+  ## Application user/db created automatically on first boot.
+  database: "metastore"
+  user: "hive"
+  password: "hive"
+  service:
+    port: 5432
+  ## Extra query args appended to the JDBC URL (e.g. sslmode=disable)
+  jdbcParams: ""
+  ## Force md5 host auth. The hive-metastore image bundles an older PostgreSQL
+  ## JDBC driver that does not implement SCRAM (auth type 10 — postgres 14+
+  ## default). These two values are only honored during the first initdb; wipe
+  ## the PVC before changing them on an existing cluster.
+  hostAuthMethod: "md5"
+  initdbArgs: "--auth-host=md5"
+  persistence:
+    enabled: true
+    size: "20Gi"
     storageClass: ""
     accessModes:
       - ReadWriteOnce

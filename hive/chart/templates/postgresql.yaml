@@ -1,0 +1,144 @@
+{{- if .Values.postgresql.enabled }}
+{{- include "hive-metastore.database.validate" . }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ include "hive-metastore.postgresql.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hive-metastore.labels" . | nindent 4 }}
+    component: postgresql
+type: Opaque
+stringData:
+  POSTGRES_DB: {{ .Values.postgresql.database | quote }}
+  POSTGRES_USER: {{ .Values.postgresql.user | quote }}
+  POSTGRES_PASSWORD: {{ .Values.postgresql.password | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "hive-metastore.postgresql.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hive-metastore.labels" . | nindent 4 }}
+    component: postgresql
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgresql
+      port: {{ .Values.postgresql.service.port }}
+      targetPort: postgresql
+      protocol: TCP
+  selector:
+    {{- include "hive-metastore.selectorLabels" . | nindent 4 }}
+    component: postgresql
+{{- if .Values.postgresql.persistence.enabled }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "hive-metastore.postgresql.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hive-metastore.labels" . | nindent 4 }}
+    component: postgresql
+spec:
+  accessModes:
+    {{- toYaml .Values.postgresql.persistence.accessModes | nindent 4 }}
+  resources:
+    requests:
+      storage: {{ .Values.postgresql.persistence.size | quote }}
+  {{- with .Values.postgresql.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "hive-metastore.postgresql.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "hive-metastore.labels" . | nindent 4 }}
+    component: postgresql
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "hive-metastore.selectorLabels" . | nindent 6 }}
+      component: postgresql
+  template:
+    metadata:
+      labels:
+        {{- include "hive-metastore.selectorLabels" . | nindent 8 }}
+        component: postgresql
+    spec:
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.postgresql.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.postgresql.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: postgresql
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy }}
+          args:
+            - -c
+            - max_connections={{ .Values.postgresql.maxConnections | default 500 }}
+          envFrom:
+            - secretRef:
+                name: {{ include "hive-metastore.postgresql.fullname" . }}
+          env:
+            ## PVC is mounted at /var/lib/postgresql/data; official image requires
+            ## a subdir when the mount root may contain lost+found or similar.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            ## Force md5 host auth so the older postgres JDBC driver bundled in
+            ## the hive-metastore image (which does not implement SCRAM/auth
+            ## type 10) can still connect. Only honored on first initdb.
+            - name: POSTGRES_INITDB_ARGS
+              value: {{ .Values.postgresql.initdbArgs | quote }}
+            - name: POSTGRES_HOST_AUTH_METHOD
+              value: {{ .Values.postgresql.hostAuthMethod | quote }}
+          ports:
+            - name: postgresql
+              containerPort: 5432
+          {{- with .Values.postgresql.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            tcpSocket:
+              port: postgresql
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          {{- if .Values.postgresql.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "hive-metastore.postgresql.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

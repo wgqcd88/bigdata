@@ -1,4 +1,5 @@
 {{- if .Values.schemaInit.enabled }}
+{{- $useHook := eq (include "hive-metastore.schemaInit.useHook" .) "true" -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,7 +7,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "hive-metastore.labels" . | nindent 4 }}
-  {{- if not .Values.mysql.enabled }}
+  {{- if $useHook }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-10"
@@ -18,7 +19,7 @@ data:
     <configuration>
         <property>
             <name>javax.jdo.option.ConnectionDriverName</name>
-            <value>{{ .Values.database.driverName }}</value>
+            <value>{{ include "hive-metastore.database.driverName" . }}</value>
         </property>
         <property>
             <name>javax.jdo.option.ConnectionURL</name>
@@ -45,7 +46,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "hive-metastore.labels" . | nindent 4 }}
-  {{- if not .Values.mysql.enabled }}
+  {{- if $useHook }}
   annotations:
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-5"
@@ -89,7 +90,25 @@ spec:
             - |
               set -e
               export HIVE_CONF_DIR=$HIVE_HOME/conf
-              DB_TYPE="{{ .Values.schemaInit.dbType }}"
+              DB_TYPE="{{ include "hive-metastore.schemaInit.dbType" . }}"
+              {{- $host := include "hive-metastore.database.embedded.host" . -}}
+              {{- $port := include "hive-metastore.database.embedded.port" . }}
+              {{- if $host }}
+              DB_HOST="{{ $host }}"
+              DB_PORT="{{ $port }}"
+              echo "Waiting for embedded DB ${DB_HOST}:${DB_PORT} to accept connections..."
+              for i in $(seq 1 60); do
+                if timeout 2 bash -c ">/dev/tcp/${DB_HOST}/${DB_PORT}" 2>/dev/null; then
+                  echo "DB is up after ${i}s."
+                  break
+                fi
+                sleep 2
+                if [ "$i" -eq 60 ]; then
+                  echo "Timed out waiting for DB." >&2
+                  exit 1
+                fi
+              done
+              {{- end }}
               echo "Checking Hive Metastore schema (dbType=${DB_TYPE})..."
               if $HIVE_HOME/bin/schematool -dbType ${DB_TYPE} -info >/dev/null 2>&1; then
                 echo "Schema already initialized. Skipping initSchema."
