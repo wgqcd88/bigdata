@@ -53,8 +53,12 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
-            - name: SERVICE_OPTS
-              value: "-Xmx{{ .Values.jvm.maxHeap }}{{ if .Values.jmxPrometheus.enabled }} -javaagent:{{ include "hive-metastore.jmx.agentJar" . }}={{ include "hive-metastore.jmx.port" . }}:{{ include "hive-metastore.jmx.configPath" . }}{{ end }}"
+           # Overrides Kubernetes' service-link METASTORE_PORT URL when the
+           # release Service is named "metastore".
+           - name: METASTORE_PORT
+             value: {{ .Values.service.port | quote }}
+           - name: SERVICE_OPTS
+             value: "-Xmx{{ .Values.jvm.maxHeap }}{{ if .Values.jmxPrometheus.enabled }} -javaagent:{{ include "hive-metastore.jmx.agentJar" . }}={{ include "hive-metastore.jmx.port" . }}:{{ include "hive-metastore.jmx.configPath" . }}{{ end }}"
           ports:
             - name: thrift
               containerPort: {{ .Values.service.port }}

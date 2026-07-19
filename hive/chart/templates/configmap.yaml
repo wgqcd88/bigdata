@@ -34,14 +34,6 @@ data:
             <value>false</value>
         </property>
         <property>
-            <name>fs.azure.account.oauth2.msi.tenant</name>
-            <value>{{ .Values.azure.tenantId }}</value>
-        </property>
-        <property>
-            <name>fs.azure.account.oauth2.client.id</name>
-            <value>{{ .Values.azure.clientId }}</value>
-        </property>
-        <property>
             <name>hive.server2.enable.doAs</name>
             <value>false</value>
         </property>
@@ -83,7 +75,7 @@ data:
         </property>
         <property>
             <name>hive.metastore.warehouse.dir</name>
-            <value>/opt/hive/data/warehouse</value>
+            <value>{{ .Values.metastore.warehouseDir | default "/opt/hive/data/warehouse" }}</value>
         </property>
         <property>
             <name>metastore.metastore.event.db.notification.api.auth</name>
@@ -98,10 +90,26 @@ data:
             <name>fs.azure.account.oauth.provider.type</name>
             <value>org.apache.hadoop.fs.azurebfs.oauth2.WorkloadIdentityTokenProvider</value>
         </property>
+        <property>
+            <name>fs.azure.account.oauth2.msi.tenant</name>
+            <value>{{ .Values.azure.tenantId }}</value>
+        </property>
+        <property>
+            <name>fs.azure.account.oauth2.client.id</name>
+            <value>{{ .Values.azure.clientId }}</value>
+        </property>
         {{- else }}
         <property>
             <name>fs.azure.account.auth.type</name>
             <value>Custom</value>
+        </property>
+        <property>
+            <name>fs.azure.account.oauth2.msi.tenant</name>
+            <value>{{ .Values.azure.tenantId }}</value>
+        </property>
+        <property>
+            <name>fs.azure.account.oauth2.client.id</name>
+            <value>{{ .Values.azure.clientId }}</value>
         </property>
         <property>
             <name>fs.azure.account.oauth2.msi.endpoint</name>

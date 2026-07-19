@@ -4,7 +4,7 @@ createNamespace: false
 ## Image
 image:
   repository: ghcr.io/wgqcd88/hive-metastore
-  tag: "3.1.3-20260705"
+  tag: "3.1.3-20260719"
   pullPolicy: IfNotPresent
   ## Image pull secrets (reference existing secrets in the namespace)
   ## Example:
@@ -33,6 +33,18 @@ nodeSelector: {}
 ##       value: "hive"
 ##       effect: "NoSchedule"
 tolerations: []
+
+## Optional Azure Disk CSI StorageClass for embedded database PVCs. Premium_ZRS
+## stores redundant replicas across availability zones and can attach in any zone.
+## It is created when an embedded database is enabled.
+storageClass:
+  enabled: true
+  name: "hive-metastore-zrs"
+  parameters:
+    skuName: Premium_ZRS
+  reclaimPolicy: Delete
+  allowVolumeExpansion: true
+  volumeBindingMode: WaitForFirstConsumer
 
 affinity:
   podAntiAffinity:
@@ -124,8 +136,7 @@ mysql:
   persistence:
     enabled: true
     size: "20Gi"
-    ## Leave empty to use the cluster default StorageClass
-    storageClass: ""
+    storageClass: "hive-metastore-zrs"
     accessModes:
       - ReadWriteOnce
   resources:
@@ -165,7 +176,7 @@ postgresql:
   persistence:
     enabled: true
     size: "20Gi"
-    storageClass: ""
+    storageClass: "hive-metastore-zrs"
     accessModes:
       - ReadWriteOnce
   resources:
@@ -174,6 +185,19 @@ postgresql:
       cpu: "500m"
   nodeSelector: {}
   tolerations: []
+
+## ---- ServiceAccount ----
+## The ServiceAccount is only rendered / mounted when azure.workloadIdentity.enabled
+## is true; these settings control how it is created and named in that case.
+serviceAccount:
+  ## When create=true, chart renders a ServiceAccount annotated for WI.
+  ## When create=false, an externally-managed SA is referenced by name.
+  create: true
+  ## SA name. Defaults to the chart fullname when empty.
+  name: "hive-metastore-sa"
+  ## Extra annotations merged into the SA (azure.workload.identity/client-id
+  ## is added automatically from azure.clientId).
+  annotations: {}
 
 ## ---- Azure identity (used in hive-site.xml) ----
 azure:
@@ -187,16 +211,7 @@ azure:
   ## webhook to be installed in the cluster (default in AKS >=1.24 with the
   ## workload identity add-on enabled).
   workloadIdentity:
-    enabled: false
-    serviceAccount:
-      ## When create=true, chart renders a ServiceAccount annotated for WI.
-      ## When create=false, an externally-managed SA is referenced by name.
-      create: true
-      ## SA name. Defaults to the chart fullname when empty.
-      name: ""
-      ## Extra annotations merged into the SA (azure.workload.identity/client-id
-      ## is added automatically from azure.clientId).
-      annotations: {}
+    enabled: true
 
 
 ## ---- Schema initialization Job (runs schematool against the metastore DB) ----
@@ -213,6 +228,8 @@ schemaInit:
 
 ## ---- Hive Metastore tuning ----
 metastore:
+  ## When non-empty, overrides hive.metastore.warehouse.dir in hive-site.xml.
+  warehouseDir: ""
   server:
     maxThreads: "300"
     minThreads: "50"

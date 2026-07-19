@@ -38,12 +38,12 @@ JMX Prometheus exporter defaults (tied to Dockerfile image layout)
 
 {{/*
 ServiceAccount name for Workload Identity. Defaults to the chart fullname
-when azure.workloadIdentity.serviceAccount.name is empty.
+when serviceAccount.name is empty.
 */}}
 {{- define "hive-metastore.serviceAccountName" -}}
-{{- $wi := .Values.azure.workloadIdentity -}}
-{{- if and $wi $wi.serviceAccount $wi.serviceAccount.name -}}
-{{ $wi.serviceAccount.name }}
+{{- $sa := .Values.serviceAccount -}}
+{{- if and $sa $sa.name -}}
+{{ $sa.name }}
 {{- else -}}
 {{ include "hive-metastore.fullname" . }}
 {{- end -}}
@@ -61,6 +61,18 @@ Embedded PostgreSQL resource name
 */}}
 {{- define "hive-metastore.postgresql.fullname" -}}
 {{ include "hive-metastore.fullname" . }}-postgresql
+{{- end -}}
+
+{{/*
+StorageClass name. Defaults to a release-specific name because StorageClasses
+are cluster-scoped.
+*/}}
+{{- define "hive-metastore.storageClass.name" -}}
+{{- if .Values.storageClass.name -}}
+{{ .Values.storageClass.name }}
+{{- else -}}
+{{ include "hive-metastore.fullname" . }}-zrs
+{{- end -}}
 {{- end -}}
 
 {{/*

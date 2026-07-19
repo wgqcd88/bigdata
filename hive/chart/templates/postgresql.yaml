@@ -50,6 +50,10 @@ spec:
       storage: {{ .Values.postgresql.persistence.size | quote }}
   {{- with .Values.postgresql.persistence.storageClass }}
   storageClassName: {{ . | quote }}
+  {{- else }}
+  {{- if $.Values.storageClass.enabled }}
+  storageClassName: {{ include "hive-metastore.storageClass.name" $ | quote }}
+  {{- end }}
   {{- end }}
 {{- end }}
 ---
